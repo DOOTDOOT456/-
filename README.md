@@ -37,11 +37,30 @@ webcam and auto-types letters so you can practice fingerspelling.
   classifier, so recognition gets better the more someone uses the app —
   for their own hand, their own way.
 - **Pre-trained seed** — a real-hand seed ships with the app already
-  (no training needed by anyone). The ✋ *Train the shared hand model*
-  tool lets the owner add their own hand on top: sign letters, click
-  **⬇ Export learned DB**, ship the JSON as `seed-db.json`. The app ships
-  as one self-contained file too: `node tools/build-single.mjs` builds
-  `signtype.html` with all code and the seed DB inlined.
+  (no training needed by anyone). The 🧠 *Build my sign database* tool
+  lets the owner add their own hand on top and ship it to everyone (see
+  below). The app also ships as one self-contained file:
+  `node tools/build-single.mjs` builds `signtype.html` with all code
+  and the database inlined.
+
+## Build your own database (db.json)
+
+You don't need to train anything — but if you want the app to ship
+pre-trained with *your* hand, it's a 3-step loop with no code:
+
+1. **Train** — open the app, expand **🧠 Build my sign database**, and
+   sign the letter shown. Each steady hold adds a sample (5+ per letter
+   is the soft target; step through with ◀ ▶).
+2. **Export** — click **⬇ Export db.json** to download your database.
+3. **Inject it into the client** — save the file as `db.json` in the
+   project root and redeploy (the multi-file version fetches it next to
+   `index.html`), *or* run `node tools/build-single.mjs` so the
+   single-file `signtype.html` inlines it. From then on every visitor
+   starts pre-trained with your database — they don't need the panel.
+
+Visitors' confident holds are still collected locally (IndexedDB) and
+recognition keeps getting better for each person, their own way.
+Everything stays in the browser; nothing is uploaded.
 - **Three practice modes** — Free type, Alphabet drill with progress
   bar, and editable Phrase drill.
 
@@ -67,8 +86,10 @@ node net.test.js          # archived neural model artifact integrity (provenance
 
 ## Seed provenance / retraining
 
-- `seed-db.json` is built by `tools/build-seed.mjs` from **4064 real
-  MediaPipe hand landmarks** across all 26 letters —
+- The shipped seed lives in `seed-db.json` (the multi-file app loads
+  `db.json` if present, else `seed-db.json`). `seed-db.json` is built by
+  `tools/build-seed.mjs` from **4064 real MediaPipe hand landmarks**
+  across all 26 letters —
   [Siruyy/asl-static-landmarks-v1](https://huggingface.co/datasets/Siruyy/asl-static-landmarks-v1)
   (CC-BY-4.0). The script un-standardizes the raw landmark columns,
   canonicalizes them (`knn.js`), collapses near-duplicates, drops
@@ -79,8 +100,8 @@ node net.test.js          # archived neural model artifact integrity (provenance
 - `tools/audit-db.mjs` scores any exported learning DB against reference
   poses and cluster stats — use it to vet training before shipping a
   seed.
-- `tools/build-single.mjs` inlines everything (and the seed) into one
-  `signtype.html`.
+- `tools/build-single.mjs` inlines everything (and `db.json`, or
+  `seed-db.json` as fallback) into one `signtype.html`.
 - **Why the neural net was archived:** `asl-net.json` (AmimulBmeIU's
   ASL Alphabet Classifier) loads and its weights are byte-exact vs the
   original, but its training preprocessing is undocumented. Feeding it

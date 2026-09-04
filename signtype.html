@@ -531,7 +531,7 @@ body {
     <!-- Train the seed model (owner tool): feed the shared learning DB,
          then Export and ship the JSON so every visitor starts pre-trained -->
     <details id="seed-train" class="seed-train">
-      <summary>✋ Train the shared hand model <span class="seed-summary muted" id="seed-summary"></span></summary>
+      <summary>🧠 Build my sign database <span class="seed-summary muted" id="seed-summary"></span></summary>
       <div class="seed-body">
         <div class="seed-target">
           <button id="seed-prev" class="small-btn" title="Previous letter">◀</button>
@@ -543,17 +543,18 @@ body {
           <button id="seed-next" class="small-btn" title="Next letter">▶</button>
         </div>
         <div class="seed-actions">
-          <button id="seed-export" class="small-btn" title="Download every learned sample as a JSON file to ship with the app">⬇ Export learned DB</button>
-          <button id="seed-import" class="small-btn" title="Load a learned DB JSON file (from you or anyone else)">⬆ Import learned DB</button>
+          <button id="seed-export" class="small-btn" title="Download every sample as db.json to ship with the app">⬇ Export db.json</button>
+          <button id="seed-import" class="small-btn" title="Load a db.json you or anyone else exported">⬆ Import db.json</button>
           <input type="file" id="seed-import-file" accept=".json,application/json" hidden>
           <span class="train-spacer"></span>
-          <button id="seed-clear" class="small-btn danger" title="Erase all learned samples in this browser">🗑 Clear</button>
+          <button id="seed-clear" class="small-btn danger" title="Erase all samples in this browser">🗑 Clear</button>
         </div>
-        <p class="seed-hint">Sign the letter shown and hold it steady — each hold adds a sample.
-          Do one pass through the alphabet, then <b>⬇ Export learned DB</b> and ship the JSON as
-          <code>seed-db.json</code> so everyone who opens the app starts with your hand model.
-          Visitors never need this panel — the app collects their confident signs automatically and
-          recognition gets better for them too. Everything stays in the browser; nothing is uploaded.</p>
+        <p class="seed-hint"><b>Build your own database:</b> sign the letter shown and hold it steady — each
+          hold adds a sample. Do one pass through the alphabet, then <b>⬇ Export db.json</b>. To make every
+          visitor start pre-trained with your database, save the file as <code>db.json</code> in the project
+          root (or rebuild <code>signtype.html</code> — it inlines it) and redeploy. Visitors never need this
+          panel — the app still collects their confident signs automatically and recognition gets better for
+          them too. Everything stays in the browser; nothing is uploaded.</p>
       </div>
     </details>
 
@@ -1332,7 +1333,10 @@ const LEARN = (function () {
   const CONF_MIN = 0.55;        // learned k-NN confidence gate (0..1)
   const NN_MAX = 1.2;           // learned k-NN nearest-neighbor distance gate
   const LEARNED_OVERRIDE = 0.75; // learned conf above this can override the rules
-  const SEED_URL = "seed-db.json";
+  // Shipped database the client loads so every visitor starts pre-trained.
+  // "db.json" is the file you build with the export button; "seed-db.json"
+  // is kept as a fallback for existing deployments.
+  const SEED_CANDIDATES = ["db.json", "seed-db.json"];
   const SEED_GOAL = 5;          // seed trainer: dots shown per letter (soft target)
   const MAX_DOTS = 8;           // cap dots rendered per letter
 
@@ -1508,12 +1512,16 @@ const LEARN = (function () {
     catch (e) { console.warn("Could not load learning library:", e); }
 
     try {
-      if (window.SEED_DB) loadSeed(window.SEED_DB, "bundled seed");
-      else {
-        const res = await fetch(SEED_URL);
-        if (res.ok) loadSeed(await res.json(), SEED_URL);
+      if (window.SEED_DB) {
+        // Single-file build inlines the db directly (see tools/build-single.mjs).
+        loadSeed(window.SEED_DB, "bundled db");
+      } else {
+        for (const url of SEED_CANDIDATES) {
+          const res = await fetch(url);
+          if (res.ok) { loadSeed(await res.json(), url); break; }
+        }
       }
-    } catch (e) { /* no seed shipped — fine */ }
+    } catch (e) { /* no db shipped — fine */ }
 
     learnedModel = library.toModel();
     learnDirty = true;
@@ -1571,18 +1579,25 @@ const LEARN = (function () {
   seedPrev.addEventListener("click", () => stepSeed(-1));
   seedNext.addEventListener("click", () => stepSeed(1));
 
+  /* The simple export mechanic: download the current database as db.json.
+     Save it at the project root (or rebuild signtype.html) and every
+     visitor starts pre-trained with your hand model. */
   seedExport.addEventListener("click", () => {
+    if (!library.total) {
+      flashSeed("Nothing to export yet — sign a letter above first", false);
+      return;
+    }
     const json = LEARN.exportJSON(library);
     const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "signtype-learn-db.json";
+    a.download = "db.json";
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    flashSeed(`Exported ${library.total} samples — ship this as seed-db.json`);
+    flashSeed(`Exported ${library.total} samples → save as db.json at the project root to ship it`);
   });
 
   seedImport.addEventListener("click", () => seedImportFile.click());

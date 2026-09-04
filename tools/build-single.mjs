@@ -1,19 +1,19 @@
 /* Copyright © 2026 [Your Full Name]. All rights reserved.
 
    Builds signtype.html — the whole app as ONE self-contained HTML file:
-   CSS and every local script inlined, and (when seed-db.json exists) the
-   trained learning DB embedded so anyone who opens the file starts with
-   the pre-trained hand model. No server, no CDN needed except MediaPipe
-   (loaded from jsdelivr at runtime).
+   CSS and every local script inlined, and (when db.json / seed-db.json
+   exists) the trained learning database embedded so anyone who opens the
+   file starts with the pre-trained hand model. No server, no CDN needed
+   except MediaPipe (loaded from jsdelivr at runtime).
 
    Usage:
      node tools/build-single.mjs
    Output: signtype.html
 
-   Owner workflow: open the app -> ✋ Train the shared hand model ->
-   sign through the alphabet -> ⬇ Export learned DB -> save the JSON as
-   seed-db.json in the project root -> run this script -> ship
-   signtype.html (+ seed-db.json for the multi-file version). */
+   Owner workflow: open the app -> 🧠 Build my sign database -> sign
+   through the alphabet -> ⬇ Export db.json -> save the JSON as db.json
+   in the project root -> run this script -> ship signtype.html
+   (or keep db.json next to index.html for the multi-file version). */
 "use strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -30,22 +30,28 @@ html = html.replace(
   "<style>\n" + read("style.css") + "\n</style>"
 );
 
-// 2. embed the trained seed DB (if present) before app.js runs
-if (fs.existsSync(path.join(root, "seed-db.json"))) {
-  const seed = fs.readFileSync(path.join(root, "seed-db.json"), "utf8");
+// 2. embed the trained database (db.json preferred, seed-db.json fallback)
+//    before app.js runs
+const SEED_CANDIDATES = ["db.json", "seed-db.json"];
+let seedFile = null;
+for (const f of SEED_CANDIDATES) {
+  if (fs.existsSync(path.join(root, f))) { seedFile = f; break; }
+}
+if (seedFile) {
+  const seed = fs.readFileSync(path.join(root, seedFile), "utf8");
   // sanity: must be parseable JSON with samples
   const parsed = JSON.parse(seed);
   if (!parsed || !Array.isArray(parsed.samples)) {
-    console.error("seed-db.json is not a valid SignType learning DB — fix or remove it.");
+    console.error(seedFile + " is not a valid SignType learning DB — fix or remove it.");
     process.exit(1);
   }
   html = html.replace(
     '<script src="app.js"></script>',
     `<script>window.SEED_DB = ${seed};</script>\n<script src="app.js"></script>`
   );
-  console.log("Embedded seed DB:", parsed.samples.length, "samples");
+  console.log("Embedded", seedFile, ":", parsed.samples.length, "samples");
 } else {
-  console.log("No seed-db.json found — building without a pre-trained seed.");
+  console.log("No db.json / seed-db.json found — building without a pre-trained database.");
 }
 
 // 3. inline every local script (CDN scripts stay as <script src>)

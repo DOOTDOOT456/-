@@ -40,7 +40,10 @@
   const CONF_MIN = 0.55;        // learned k-NN confidence gate (0..1)
   const NN_MAX = 1.2;           // learned k-NN nearest-neighbor distance gate
   const LEARNED_OVERRIDE = 0.75; // learned conf above this can override the rules
-  const SEED_URL = "seed-db.json";
+  // Shipped database the client loads so every visitor starts pre-trained.
+  // "db.json" is the file you build with the export button; "seed-db.json"
+  // is kept as a fallback for existing deployments.
+  const SEED_CANDIDATES = ["db.json", "seed-db.json"];
   const SEED_GOAL = 5;          // seed trainer: dots shown per letter (soft target)
   const MAX_DOTS = 8;           // cap dots rendered per letter
 
@@ -216,12 +219,16 @@
     catch (e) { console.warn("Could not load learning library:", e); }
 
     try {
-      if (window.SEED_DB) loadSeed(window.SEED_DB, "bundled seed");
-      else {
-        const res = await fetch(SEED_URL);
-        if (res.ok) loadSeed(await res.json(), SEED_URL);
+      if (window.SEED_DB) {
+        // Single-file build inlines the db directly (see tools/build-single.mjs).
+        loadSeed(window.SEED_DB, "bundled db");
+      } else {
+        for (const url of SEED_CANDIDATES) {
+          const res = await fetch(url);
+          if (res.ok) { loadSeed(await res.json(), url); break; }
+        }
       }
-    } catch (e) { /* no seed shipped — fine */ }
+    } catch (e) { /* no db shipped — fine */ }
 
     learnedModel = library.toModel();
     learnDirty = true;
@@ -279,18 +286,25 @@
   seedPrev.addEventListener("click", () => stepSeed(-1));
   seedNext.addEventListener("click", () => stepSeed(1));
 
+  /* The simple export mechanic: download the current database as db.json.
+     Save it at the project root (or rebuild signtype.html) and every
+     visitor starts pre-trained with your hand model. */
   seedExport.addEventListener("click", () => {
+    if (!library.total) {
+      flashSeed("Nothing to export yet — sign a letter above first", false);
+      return;
+    }
     const json = LEARN.exportJSON(library);
     const blob = new Blob([json], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "signtype-learn-db.json";
+    a.download = "db.json";
     document.body.appendChild(a);
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    flashSeed(`Exported ${library.total} samples — ship this as seed-db.json`);
+    flashSeed(`Exported ${library.total} samples → save as db.json at the project root to ship it`);
   });
 
   seedImport.addEventListener("click", () => seedImportFile.click());
