@@ -8,15 +8,20 @@ webcam and auto-types letters so you can practice fingerspelling.
 - **Camera + hand tracking** — MediaPipe Hands draws a live skeleton
   overlay on your webcam feed (mirrored). No camera? Click the on-screen
   keyboard instead.
-- **Neural recognition engine** — a small neural network (shipped as
-  `asl-net.json`, executed by the dependency-free `net.js`) classifies
-  the 21 hand landmarks into static letters **A–Y, N/P/Q included**. The
-  weights come from the *ASL Alphabet Classifier* by AmimulBmeIU
-  (MIT license, 94.15% reported validation accuracy) — see
-  [Third-party notices](#third-party-notices). The tested rule-based
-  classifier (`asl.js`) stays in charge whenever the net is unsure or
-  disagrees, so the neural engine can only add letters, never regress the
-  rules. Open palm types a space; **J** and **Z** are traced in the air.
+- **Learned recognition engine** — the primary classifier is a
+  weighted k-NN over real hand samples (`knn.js` + `db.js`), covering
+  all 24 static letters **A–Y, N/P/Q included**. The shipped seed
+  (`seed-db.json`) is built from 4064 real MediaPipe hand landmarks
+  (Siruyy/asl-static-landmarks-v1, CC-BY-4.0), canonicalized (position,
+  size, tilt and left/right hand normalized away), self-cleaned by
+  leave-one-out k-NN, and measures **83.8% leave-one-out accuracy** on
+  real hands — **≥94% precise at confidence ≥0.75**, which is when it
+  overrides the geometric rules. The tested rule classifier (`asl.js`)
+  is the default otherwise and handles open-palm space plus **J**/**Z**
+  motion tracing. (The old neural net was found to be trained on an
+  undocumented preprocessing that never worked on real inputs — it
+  collapsed to a few classes on everything tested — so it was removed
+  from the decision path; files remain for provenance.)
 - **Anti-flicker voting** — per-frame guesses are smoothed by a
   sliding-window majority vote, so one glitchy frame can't reset a hold
   or type the wrong letter; hand orientation is normalized first, so
@@ -24,14 +29,13 @@ webcam and auto-types letters so you can practice fingerspelling.
 - **Learns from every signer (no training needed)** — confident holds
   are stored in a small in-browser database (`db.js`, IndexedDB), grouped
   per letter, deduped and capped per letter. The collection *is* the
-  classifier: a weighted k-NN over the accumulated samples that joins the
-  neural net and rules as a third engine, so recognition gets better the
-  more someone uses the app — for their own hand, their own way.
-- **Pre-trained seed** — the owner trains once with the ✋ *Train the
-  shared hand model* tool, clicks **⬇ Export learned DB**, ships the JSON
-  as `seed-db.json` (or embeds it), and every visitor starts with that
-  model already loaded — they just sign like normal. The app ships as
-  one self-contained file too: `node tools/build-single.mjs` builds
+  classifier, so recognition gets better the more someone uses the app —
+  for their own hand, their own way.
+- **Pre-trained seed** — a real-hand seed ships with the app already
+  (no training needed by anyone). The ✋ *Train the shared hand model*
+  tool lets the owner add their own hand on top: sign letters, click
+  **⬇ Export learned DB**, ship the JSON as `seed-db.json`. The app ships
+  as one self-contained file too: `node tools/build-single.mjs` builds
   `signtype.html` with all code and the seed DB inlined.
 - **Three practice modes** — Free type, Alphabet drill with progress
   bar, and editable Phrase drill.
@@ -52,31 +56,46 @@ Webcam access needs a secure context: use `http://localhost`, not a raw
 node classifier.test.js   # rule-based classifier (incl. tilt invariance)
 node knn.test.js          # k-NN canonicalization + accuracy
 node vote.test.js         # temporal smoothing voter
-node net.test.js          # neural model structure + forward-pass integrity
 node db.test.js           # learning library: dedupe, caps, seed export/import
+node net.test.js          # archived neural model artifact integrity (provenance)
 ```
 
-## Retraining / model provenance
+## Seed provenance / retraining
 
-- `tools/export-net.mjs` re-exports `asl-net.json` from the original
-  TensorFlow.js files in `tools/model/` (downloadable from
-  https://huggingface.co/AmimulBmeIU/asl-alphabet-classifier).
-- `tools/parity-tfjs.mjs` loads the real TF.js model (Node + the wasm
-  backend, `npm i` in `tools/`) and proves the sliced weights reproduce
-  it exactly (max output diff < 1e-6). `net.test.js` guards the shipped
-  artifact's integrity.
-- Honest limits: this box had no GPU and no way to run MediaPipe on
-  images headlessly, so the neural engine was verified for weight
-  fidelity and forward-pass correctness — but not end-to-end on a live
-  webcam. The rules-first gating means that if the net misreads your
-  hand, you get the previous rule-based reading rather than a new error.
+- `seed-db.json` is built by `tools/build-seed.mjs` from **4064 real
+  MediaPipe hand landmarks** across all 26 letters —
+  [Siruyy/asl-static-landmarks-v1](https://huggingface.co/datasets/Siruyy/asl-static-landmarks-v1)
+  (CC-BY-4.0). The script un-standardizes the raw landmark columns,
+  canonicalizes them (`knn.js`), collapses near-duplicates, drops
+  label-noise samples via leave-one-out k-NN disagreement, and reports
+  the per-letter accuracy of what ships.
+  (The npy files are downloaded into `tools/data/siruyy/` — gitignored,
+  ~5 MB.)
+- `tools/audit-db.mjs` scores any exported learning DB against reference
+  poses and cluster stats — use it to vet training before shipping a
+  seed.
+- `tools/build-single.mjs` inlines everything (and the seed) into one
+  `signtype.html`.
+- **Why the neural net was archived:** `asl-net.json` (AmimulBmeIU's
+  ASL Alphabet Classifier) loads and its weights are byte-exact vs the
+  original, but its training preprocessing is undocumented. Feeding it
+  real landmarks — and the app's own synthetic poses — collapses it to a
+  few classes (13.5% label agreement on real data, 2/20 on synthetic,
+  across every plausible normalization). It never worked end-to-end, so
+  it was removed from the decision path; `net.js`, `asl-net.json`,
+  `tools/export-net.mjs`, `tools/parity-tfjs.mjs` and `net.test.js` stay
+  for provenance.
 
 ## Third-party notices
 
-- `asl-net.json` contains weights from the **ASL Alphabet Classifier**
+- `seed-db.json` contains landmark samples from
+  **Siruyy/asl-static-landmarks-v1**
+  (https://huggingface.co/datasets/Siruyy/asl-static-landmarks-v1), ©
+  its author, CC-BY-4.0.
+- `asl-net.json` (archived, not loaded by the app) contains weights from
+  the **ASL Alphabet Classifier**
   (https://huggingface.co/AmimulBmeIU/asl-alphabet-classifier), © its
-  author, MIT License. The model maps 21 MediaPipe hand landmarks to the
-  24 static ASL letters A–Y (no J/Z).
+  author, MIT License.
 - MediaPipe Hands, camera utils, drawing utils — Google, Apache-2.0
   (loaded from cdn.jsdelivr.net).
 
@@ -84,5 +103,6 @@ node db.test.js           # learning library: dedupe, caps, seed export/import
 
 Copyright © 2026 [Your Full Name]. All rights reserved — see
 [LICENSE](LICENSE). This project is not open source; copying or reusing
-any part of it requires written permission from the owner. (The
-`asl-net.json` weights keep their MIT license as noted above.)
+any part of it requires written permission from the owner. (The seed's
+CC-BY-4.0 samples and the archived net's MIT weights keep their own
+licenses as noted above.)

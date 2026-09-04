@@ -2,15 +2,19 @@
 
    SignType — app glue: webcam, hand tracking, typing logic, UI.
    Recognition engines:
-     - neural (net.js + asl-net.json): a CNN trained on the public
-       Sign Language MNIST dataset — the default engine for static
-       letters. Covers A-Y incl. N/P/Q.
-     - rules (asl.js): a fallback when the net is unsure, plus
-       open-hand space and J/Z motion tracing.
-     - learned (db.js + knn.js): an in-browser database of sign samples
+     - learned (db.js + knn.js): the primary engine. A database of real
+       sign samples (a shipped seed trained on real hands, plus samples
        collected automatically from every confident hold, grouped per
-       letter and classified with k-NN. It gets better the more the app
-       is used, and a shipped seed DB means new users start pre-trained. */
+       letter) classified with weighted k-NN. Calibrated on real data:
+       ~84% leave-one-out accuracy overall, and >=94% precise at
+       confidence >= 0.75 — so it can safely override the rules.
+     - rules (asl.js): the tested geometric classifier — the default for
+       letters the learned engine hasn't seen, open-hand space, and J/Z
+       motion tracing.
+     - The old neural engine (net.js + asl-net.json) was removed from
+       the decision path: its training preprocessing is undocumented and
+       it provably never worked on real inputs (it collapses to a few
+       classes on every input tested). Files remain for provenance. */
 "use strict";
 
 (function () {
@@ -33,11 +37,9 @@
   // ---------------- constants ----------------
   const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   const LEGACY_MODEL_KEY = "signtype-knn-model-v1"; // My-signs model, migrated once
-  const NET_CONF_MIN = 0.6;     // neural engine: act on a class only above this
-  const COLLECT_CONF = 0.75;    // auto-collect a sample only when the net is this sure
-  const NET_ONLY = new Set(["N", "P", "Q"]); // letters the rules can't produce
   const CONF_MIN = 0.55;        // learned k-NN confidence gate (0..1)
   const NN_MAX = 1.2;           // learned k-NN nearest-neighbor distance gate
+  const LEARNED_OVERRIDE = 0.75; // learned conf above this can override the rules
   const SEED_URL = "seed-db.json";
   const SEED_GOAL = 5;          // seed trainer: dots shown per letter (soft target)
   const MAX_DOTS = 8;           // cap dots rendered per letter
@@ -65,10 +67,6 @@
   let frameCount = 0, fps = 0, fpsTimer = performance.now();
   let noHandFrames = 0;
   let lastGlyph = null, lastCls = null, flashAt = 0;
-
-  // ---- neural engine state (net.js + asl-net.json) ----
-  let netModel = null;
-  let netStatus = "loading";   // "loading" | "ready" | "error"
 
   // ---- learning library state (db.js) ----
   let library = new LEARN.Library();
@@ -492,76 +490,48 @@
     }
   }
 
-  // ---------------- neural engine ----------------
-  async function initNet() {
-    try {
-      const res = await fetch("asl-net.json");
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      netModel = NET.load(await res.json());
-      netStatus = "ready";
-      console.log("Neural engine ready:", netModel.letters.length, "letters");
-    } catch (e) {
-      netStatus = "error";
-      console.warn("Neural engine unavailable (", e.message, ") — falling back to rules only");
-    }
-  }
-
-  /* Run the neural engine on this frame's landmarks: flatten the 21
-     mediapipe points [x, y, z] in order (as the model was trained) and
-     classify. Returns { letter, conf, probs } or null when no model. */
-  function predictNet(lm) {
-    if (!netModel) return null;
-    const v = new Float32Array(63);
-    for (let i = 0; i < 21; i++) {
-      v[i * 3] = lm[i].x;
-      v[i * 3 + 1] = lm[i].y;
-      v[i * 3 + 2] = lm[i].z;
-    }
-    return NET.predict(netModel, v);
-  }
-
-  /* The three-engine decision. Returns:
-       { letter, via, conf, vec, hint }
-     letter: the chosen letter or null; via: "net" | "rules" | "learned";
-     vec: canonical vector for collection; hint: what to show when unsure.
-     Rules stay in charge unless the net is confident AND (rules agree,
-     rules are silent, the letter is net-only N/P/Q, or the learned DB —
-     which knows this user's hand — backs the net). The learned DB is
-     also the final fallback for letters the net hasn't learned well. */
+  /* The two-engine decision. Returns:
+       { letter, via, conf, vec, hint, learnedOk, learnedLetter }
+     letter: chosen letter or null; via: "agreed" | "rules" | "learned";
+     vec: canonical vector for auto-collection; hint: unsure-pose text.
+     Ladder (validated on real data):
+       1. rules and learned agree  -> strongest signal
+       2. learned >= LEARNED_OVERRIDE (>=94% precise) -> trust the crowd
+       3. rules                    -> the tested default
+       4. learned (gated 0.55/1.2) -> covers N/P/Q and user style
+     The learned engine is a k-NN over a real-hand seed (shipped) plus
+     everything collected locally, so it gets better with use. */
   function classifyFrame(flat, feats) {
     const rulesLetter = ASL.classify(feats);
-    const nres = predictNet(flat);
     const vec = KNN.canonicalize(flat);
     let learned = null;
     if (vec) learned = learnedModel.classify(vec);
     const learnedOk = !!(learned && learned.letter &&
       learned.conf >= CONF_MIN && learned.nn <= NN_MAX);
+    const learnedLetter = learned && learned.letter;
 
-    if (nres) {
-      const netOnly = NET_ONLY.has(nres.letter);
-      if (nres.conf >= NET_CONF_MIN) {
-        const agreeRules = rulesLetter === nres.letter;
-        const agreeLearned = learnedOk && learned.letter === nres.letter;
-        if (netOnly || agreeRules || !rulesLetter || agreeLearned) {
-          return { letter: nres.letter, via: "net", conf: nres.conf, vec,
-            hint: `${nres.letter} · ${Math.round(nres.conf * 100)}% confident — hold to type` };
-        }
-      }
+    if (rulesLetter && learnedOk && learnedLetter === rulesLetter) {
+      return { letter: rulesLetter, via: "agreed", conf: learned.conf, vec,
+        learnedOk, learnedLetter, hint: ASL.LETTERS[rulesLetter].desc };
+    }
+    if (learnedOk && learned.conf >= LEARNED_OVERRIDE) {
+      return { letter: learnedLetter, via: "learned", conf: learned.conf, vec,
+        learnedOk, learnedLetter,
+        hint: `your ${learnedLetter} · learned from ${library.counts()[learnedLetter] || 0} samples — hold to type` };
     }
     if (rulesLetter) {
       return { letter: rulesLetter, via: "rules", conf: 0, vec,
-        hint: ASL.LETTERS[rulesLetter].desc };
+        learnedOk, learnedLetter, hint: ASL.LETTERS[rulesLetter].desc };
     }
     if (learnedOk) {
-      return { letter: learned.letter, via: "learned", conf: learned.conf, vec,
-        hint: `your ${learned.letter} · learned from ${library.counts()[learned.letter] || 0} samples — hold to type` };
+      return { letter: learnedLetter, via: "learned", conf: learned.conf, vec,
+        learnedOk, learnedLetter,
+        hint: `your ${learnedLetter} · learned from ${library.counts()[learnedLetter] || 0} samples — hold to type` };
     }
-    let hint = "Not recognized — check the guide";
-    if (nres) hint = `Net: ${nres.letter} at ${Math.round(nres.conf * 100)}% — hold still or adjust your hand`;
-    else if (learned && learned.letter) {
-      hint = `Learned ${learned.letter} only ${Math.round(learned.conf * 100)}% — hold still or add samples`;
-    }
-    return { letter: null, via: "none", conf: 0, vec, hint };
+    const hint = learned && learned.letter
+      ? `Learned ${learned.letter} only ${Math.round(learned.conf * 100)}% — hold still or check the guide`
+      : "Not recognized — check the guide";
+    return { letter: null, via: "none", conf: 0, vec, learnedOk, learnedLetter, hint };
   }
 
   function onResults(results) {
@@ -682,12 +652,16 @@
         }
       } else if (typedLetter !== stableLetter) {
         // hold just started: the vote majority is solid, so this is a
-        // good moment to learn from the sign
+        // good moment to learn from the sign. Collect when the reading is
+        // strong — learned at >=75% (98% precise) or rules backed by the
+        // learned DB / no learned opinion yet (bootstrap).
         if (rawLetter !== null && rawLetter === typedLetter && typedLetter !== " ") {
-          if (read.via === "net" && read.conf >= COLLECT_CONF) {
-            collectSample(typedLetter, read.vec); // automatic learning
-          } else if (seedTrain.open && typedLetter === seedTarget) {
-            collectSample(typedLetter, read.vec); // deliberate seed training
+          const strongLearned = read.via === "learned" && read.conf >= LEARNED_OVERRIDE;
+          const rulesTrusted = read.via === "rules" &&
+            (!read.learnedOk || read.learnedLetter === typedLetter);
+          if (strongLearned || rulesTrusted ||
+              (seedTrain.open && typedLetter === seedTarget)) {
+            collectSample(typedLetter, read.vec);
           }
         }
         stableLetter = typedLetter;
@@ -721,7 +695,6 @@
     const dots = names.map((n) =>
       `<span class="f-${feats.ext[n] ? "on" : "off"}" title="${n}">${feats.ext[n] ? "●" : "○"}</span>`).join("");
     const thumb = `<span class="f-${feats.thumbOut ? "on" : "off"}" title="thumb">${feats.thumbOut ? "●" : "○"}</span>`;
-    const engine = netStatus === "ready" ? "🧠 neural" : netStatus === "error" ? "rules" : "🧠 loading…";
     const learned = library.total
       ? `<span class="f-label">· learned</span> ${library.total}/${Object.keys(library.counts()).length}`
       : "";
@@ -729,13 +702,12 @@
       `<span class="f-label">pattern ${feats.pattern}</span> ${dots}${thumb}` +
       `<span class="f-label">· thumb ${feats.thumbOut ? "out" : "folded"}</span>` +
       learned +
-      `<span class="f-fps">${engine} · ${fps} fps</span>`;
+      `<span class="f-fps">🧠 learned · ${fps} fps</span>`;
   }
 
   // ---------------- go ----------------
   renderSeed();
   updateOutputUI();
-  initNet();
   initLearn();
   initCamera();
 })();

@@ -110,11 +110,11 @@
   <p class="guide-note">
     Hold each sign steady for about half a second to type it — the highlighted key shows what the camera sees right now.
     An open palm (<b>5</b>) types a space, and <b>J</b>/<b>Z</b> are traced in the air with your index finger.
-    Letters are read by a <b>neural engine</b> (trained on the public ASL Alphabet dataset, so no setup needed),
-    which covers all 24 static letters including <b>N</b>, <b>P</b> and <b>Q</b>.
-    The app also <b>learns from every signer</b>: confident holds are stored in a small in-browser
-    database, grouped per letter, and that learned model helps recognize each person's hand better
-    the more they use it. The shipped copy can come pre-trained (see ✋ Train the shared hand model).
+    Letters are read by a <b>learned engine</b>: a database of real hand samples (a pre-trained seed
+    covers all 24 static letters including <b>N</b>, <b>P</b> and <b>Q</b>) plus a geometric rule
+    classifier, combined by agreement. The app also <b>learns from every signer</b> — confident holds
+    are stored in a small in-browser database, grouped per letter, and recognition gets better the
+    more it's used. The shipped copy comes pre-trained (see ✋ Train the shared hand model).
   </p>
   <div class="guide-grid" id="guide-grid"></div>
 </section>
@@ -125,7 +125,6 @@
 <script src="asl.js"></script>
 <script src="knn.js"></script>
 <script src="vote.js"></script>
-<script src="net.js"></script>
 <script src="db.js"></script>
 <script src="app.js"></script>
 </body>
