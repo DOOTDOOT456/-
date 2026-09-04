@@ -63,6 +63,17 @@ body {
   font-size: 15px;
 }
 .icon-btn:hover { border-color: var(--accent); }
+.version-badge {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--muted);
+  background: rgba(11, 16, 32, 0.5);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 10px;
+  white-space: nowrap;
+  align-self: center;
+}
 .status {
   font-size: 13px;
   color: var(--good);
