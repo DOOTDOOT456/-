@@ -1516,9 +1516,14 @@ const LEARN = (function () {
         // Single-file build inlines the db directly (see tools/build-single.mjs).
         loadSeed(window.SEED_DB, "bundled db");
       } else {
+        // Try each candidate independently so a missing/corrupt db.json
+        // (or a fetch that throws, e.g. under file://) still falls back
+        // to the shipped seed-db.json.
         for (const url of SEED_CANDIDATES) {
-          const res = await fetch(url);
-          if (res.ok) { loadSeed(await res.json(), url); break; }
+          try {
+            const res = await fetch(url);
+            if (res.ok) { loadSeed(await res.json(), url); break; }
+          } catch (e) { console.warn("Seed DB " + url + " unavailable:", e); }
         }
       }
     } catch (e) { /* no db shipped — fine */ }
