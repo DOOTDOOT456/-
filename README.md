@@ -5,9 +5,14 @@ webcam and auto-types letters so you can practice fingerspelling.
 
 ## Features
 
-- **Camera + hand tracking** — MediaPipe Hands draws a live skeleton
-  overlay on your webcam feed (mirrored). No camera? Click the on-screen
-  keyboard instead.
+- **Camera + hand tracking** — the modern MediaPipe Hand Landmarker
+  task (MediaPipe Tasks Vision, GPU-accelerated, VIDEO running mode)
+  draws a live skeleton overlay on your webcam feed (mirrored). It
+  tracks the hand between frames with a lightweight matcher and only
+  re-runs palm detection when tracking fails, so it holds onto your
+  hand far more reliably under motion, tilt and partial occlusion than
+  the old deprecated `@mediapipe/hands` solution. No camera? Click the
+  on-screen keyboard instead.
 - **Learned recognition engine** — the primary classifier is a
   weighted k-NN over real hand samples (`knn.js` + `db.js`), covering
   all 24 static letters **A–Y, N/P/Q included**. The shipped seed
@@ -96,8 +101,10 @@ node net.test.js          # archived neural model artifact integrity (provenance
   the **ASL Alphabet Classifier**
   (https://huggingface.co/AmimulBmeIU/asl-alphabet-classifier), © its
   author, MIT License.
-- MediaPipe Hands, camera utils, drawing utils — Google, Apache-2.0
-  (loaded from cdn.jsdelivr.net).
+- MediaPipe Hand Landmarker task (`@mediapipe/tasks-vision`, bundled
+  WASM runtime) — Google, Apache-2.0 (loaded from cdn.jsdelivr.net);
+  the `hand_landmarker.task` model is served by Google's model storage.
+  Landmark drawing is done in-app (no external drawing utils).
 
 ## License
 

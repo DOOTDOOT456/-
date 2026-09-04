@@ -79,6 +79,36 @@
 
   const REL_BADGE = { solid: "reliable", approx: "approx", motion: "trace it", no: "not detected" };
 
+  /* Hand landmark drawing (self-contained — the old MediaPipe drawing_utils
+     helper is gone now that we use the modern HandLandmarker task). */
+  const HAND_CONNECTIONS = [
+    [0, 1], [1, 2], [2, 3], [3, 4],              // thumb
+    [0, 5], [5, 6], [6, 7], [7, 8],              // index
+    [5, 9], [9, 10], [10, 11], [11, 12],         // middle
+    [9, 13], [13, 14], [14, 15], [15, 16],       // ring
+    [13, 17], [17, 18], [18, 19], [19, 20],      // pinky
+    [0, 17],                                     // palm heel
+  ];
+  function drawHand(ctx, lm) {
+    const px = (i) => lm[i].x * ctx.canvas.width;
+    const py = (i) => lm[i].y * ctx.canvas.height;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#22d3ee";
+    ctx.lineJoin = "round";
+    for (const [a, b] of HAND_CONNECTIONS) {
+      ctx.beginPath();
+      ctx.moveTo(px(a), py(a));
+      ctx.lineTo(px(b), py(b));
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#f472b6";
+    for (let i = 0; i < lm.length; i++) {
+      ctx.beginPath();
+      ctx.arc(px(i), py(i), 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
   // ---------------- build static UI ----------------
   const KEY_ROWS = [
     ["A", "B", "C", "D", "E", "F", "G", "H"],
@@ -455,39 +485,83 @@
   });
 
   // ---------------- camera + tracking ----------------
+  let landmarker = null;
+  let lastVideoTime = -1;
+
+  /* Modern MediaPipe Hand Landmarker task (GPU-accelerated, VIDEO mode).
+     This replaces the old deprecated @mediapipe/hands "Hands" solution,
+     which ran in IMAGE mode on the CPU and lost tracking easily. The task
+     API tracks a hand between frames with a lightweight matcher and only
+     re-runs palm detection when tracking fails, so detection is much more
+     stable under motion, tilt and partial occlusion. The 21 normalized
+     landmarks it emits use the same conventions as the old engine, so the
+     whole recognition stack (rules + learned k-NN) works unchanged. */
   async function initCamera() {
-    if (typeof Hands === "undefined" || typeof Camera === "undefined") {
-      setStatus("Hand-tracking libraries failed to load (check internet)", true);
-      cameraError.classList.remove("hidden");
-      return;
-    }
+    // 1) Open the webcam. Raw (non-mirrored) feed — we mirror on the canvas.
     try {
-      const hands = new Hands({
-        locateFile: (f) => "https://cdn.jsdelivr.net/npm/@mediapipe/hands/" + f,
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 480, facingMode: "user" },
+        audio: false,
       });
-      hands.setOptions({
-        maxNumHands: 1,
-        modelComplexity: 1,
-        minDetectionConfidence: 0.6,
-        minTrackingConfidence: 0.5,
-        selfieMode: true,
-      });
-      hands.onResults(onResults);
-      const camera = new Camera(video, {
-        onFrame: async () => { await hands.send({ image: video }); },
-        width: 640,
-        height: 480,
-      });
-      setStatus("Starting camera…");
-      await camera.start();
+      video.srcObject = stream;
+      await video.play();
       canvas.width = video.videoWidth || 640;
       canvas.height = video.videoHeight || 480;
-      setStatus("Ready — hold a sign to type");
     } catch (err) {
       console.error(err);
       setStatus("Camera unavailable", true);
       cameraError.classList.remove("hidden");
+      return;
     }
+
+    // 2) Load the Hand Landmarker task + its WASM runtime.
+    try {
+      setStatus("Loading hand-tracking model…");
+      const vision = await import(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.mjs"
+      );
+      const fileset = await vision.FilesetResolver.forVisionTasks(
+        "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+      );
+      const makeOpts = (delegate) => ({
+        baseOptions: {
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+          delegate,
+        },
+        runningMode: "VIDEO",
+        numHands: 1,
+        minHandDetectionConfidence: 0.5,
+        minHandPresenceConfidence: 0.5,
+        minTrackingConfidence: 0.5,
+      });
+      try {
+        landmarker = await vision.HandLandmarker.createFromOptions(fileset, makeOpts("GPU"));
+      } catch (e) {
+        // No WebGL2 / GPU unsupported — fall back to CPU.
+        landmarker = await vision.HandLandmarker.createFromOptions(fileset, makeOpts("CPU"));
+      }
+      setStatus("Ready — hold a sign to type");
+      requestAnimationFrame(renderLoop);
+    } catch (err) {
+      console.error(err);
+      setStatus("Hand-tracking engine failed to load (check internet)", true);
+      cameraError.classList.remove("hidden");
+    }
+  }
+
+  /* Drive the landmarker in VIDEO mode: one detectForVideo call per new
+     video frame, with a monotonic timestamp (performance.now()). */
+  function renderLoop() {
+    if (!landmarker) return;
+    const t = video.currentTime;
+    if (t !== lastVideoTime) {
+      lastVideoTime = t;
+      try {
+        onResults(landmarker.detectForVideo(video, performance.now()));
+      } catch (e) { /* duplicate/edge frame — just skip it */ }
+    }
+    requestAnimationFrame(renderLoop);
   }
 
   /* The two-engine decision. Returns:
@@ -534,18 +608,23 @@
     return { letter: null, via: "none", conf: 0, vec, learnedOk, learnedLetter, hint };
   }
 
-  function onResults(results) {
+  function onResults(result) {
     frameCount++;
     const now = performance.now();
 
+    const lm = result && result.landmarks && result.landmarks[0];
+
     ctx.save();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+    // Mirror the live frame (selfie view, same as the old selfieMode). The
+    // camera feed is raw/un-mirrored; the canvas shows the mirrored copy.
+    ctx.setTransform(-1, 0, 0, 1, canvas.width, 0);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-    const lm = results.multiHandLandmarks && results.multiHandLandmarks[0];
     if (lm) {
-      drawConnectors(ctx, lm, HAND_CONNECTIONS, { color: "#22d3ee", lineWidth: 3 });
-      drawLandmarks(ctx, lm, { color: "#f472b6", lineWidth: 2, radius: 4 });
+      // Mirror landmark x too, so the skeleton lines up with the frame.
+      drawHand(ctx, lm.map((p) => ({ x: 1 - p.x, y: p.y, z: p.z })));
       noHandFrames = 0;
       handHint.classList.remove("show");
       processFrame(lm, now);
