@@ -1,0 +1,7 @@
+# Freebuff tool internals (do not commit)
+.freebuff/
+
+# Node dev artifacts (used only by tools/ scripts)
+node_modules/
+tools/data/
+*.log

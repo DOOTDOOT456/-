@@ -1,0 +1,136 @@
+<!--
+  SignType — ASL letter practice
+  Copyright © 2026 [Your Full Name]. All rights reserved.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SignType — ASL letter practice</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-icon">🖐️</span>
+    <span class="brand-name">SignType</span>
+    <span class="tagline">ASL letter practice</span>
+  </div>
+  <div class="topbar-right">
+    <button id="sound-toggle" class="icon-btn" title="Toggle tick sound">🔊</button>
+    <span id="status" class="status">Loading…</span>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- Camera -->
+  <section class="card camera-card">
+    <div class="video-wrap">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="canvas"></canvas>
+      <div id="camera-error" class="camera-error hidden">
+        <p class="camera-error-title">📷 Camera unavailable</p>
+        <p class="camera-error-hint">Allow camera access, or open this page in Chrome / Edge / Firefox (webcam needs a secure context). You can still practice by clicking the keyboard.</p>
+      </div>
+      <div id="hand-hint" class="hand-hint">✋ Show a hand in the frame</div>
+    </div>
+    <div class="feature-strip" id="features"></div>
+  </section>
+
+  <!-- Control / output -->
+  <section class="card control-card">
+    <div class="letter-display">
+      <div id="current-letter" class="current-letter">—</div>
+      <div id="current-letter-name" class="current-letter-name">Hold a sign steady to type it</div>
+    </div>
+
+    <div class="modes">
+      <button class="mode-btn active" data-mode="free">Free type</button>
+      <button class="mode-btn" data-mode="alphabet">Alphabet</button>
+      <button class="mode-btn" data-mode="phrase">Phrase</button>
+      <button class="mode-btn" data-mode="train" title="Train your own model">✍️ My signs</button>
+    </div>
+
+    <div id="drill" class="drill hidden">
+      <div class="drill-target" id="drill-target"></div>
+      <div class="drill-progress"><div class="drill-bar" id="drill-bar"></div></div>
+    </div>
+
+    <div id="phrase-row" class="phrase-row hidden">
+      <input id="phrase-input" type="text" value="WELCOME TO MY WORLD" spellcheck="false" maxlength="80">
+      <button id="phrase-start" class="small-btn">Start</button>
+    </div>
+
+    <!-- My signs: record your own samples, classify with k-NN -->
+    <div id="train-panel" class="train-panel hidden">
+      <div class="train-tabs">
+        <button id="tab-record" class="tab-btn active">🎯 Record</button>
+        <button id="tab-practice" class="tab-btn">▶ Practice</button>
+      </div>
+
+      <div id="record-view">
+        <div class="train-target">
+          <div class="train-big" id="train-big">A</div>
+          <div class="train-meta">
+            <div class="train-target-name" id="train-target-name"></div>
+            <div class="train-dots" id="train-dots"></div>
+          </div>
+        </div>
+        <div class="train-grid" id="train-grid"></div>
+        <div class="train-actions">
+          <button id="capture-btn" class="small-btn" title="Record one sample of the target letter right now">📸 Capture</button>
+          <button id="skip-btn" class="small-btn" title="Move to the next letter that still needs samples">Skip ➜</button>
+          <span class="train-spacer"></span>
+          <button id="undo-btn" class="small-btn" title="Remove the most recent sample">↩ Undo</button>
+          <button id="clear-model-btn" class="small-btn danger" title="Erase the whole model">🗑 Clear</button>
+        </div>
+      </div>
+
+      <div id="practice-view" class="hidden">
+        <div class="practice-live" id="practice-live"></div>
+        <div class="practice-hint">Sign a letter from your model and hold it steady (~0.5 s) to type it below.
+          Letters need at least 2 samples to be recognized (3+ is better); letters with fewer samples are ignored.
+          This model learns whatever signs you record — N, P and Q included.</div>
+        <div class="practice-ready muted" id="practice-ready"></div>
+      </div>
+
+      <div class="train-foot" id="train-foot"></div>
+    </div>
+
+    <div class="keyboard" id="keyboard"></div>
+
+    <div class="typed-section">
+      <div class="typed-label">Typed output <span class="typed-sub" id="typed-sub"></span></div>
+      <div id="typed-box" class="typed-box"></div>
+      <div class="typed-actions">
+        <button id="copy-btn" class="small-btn">Copy</button>
+        <button id="clear-btn" class="small-btn">Clear</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<section class="card guide-card">
+  <h2>Letter guide</h2>
+  <p class="guide-note">
+    Hold each sign steady for about half a second to type it — the highlighted key shows what the camera sees right now.
+    An open palm (<b>5</b>) types a space, and <b>J</b>/<b>Z</b> are traced in the air with your index finger.
+    Letters are read by a <b>neural engine</b> (trained on the public ASL Alphabet dataset, so no setup needed),
+    which covers all 24 static letters including <b>N</b>, <b>P</b> and <b>Q</b>.
+  </p>
+  <div class="guide-grid" id="guide-grid"></div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="asl.js"></script>
+<script src="knn.js"></script>
+<script src="vote.js"></script>
+<script src="net.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
