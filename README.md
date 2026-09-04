@@ -21,10 +21,18 @@ webcam and auto-types letters so you can practice fingerspelling.
   sliding-window majority vote, so one glitchy frame can't reset a hold
   or type the wrong letter; hand orientation is normalized first, so
   tilted hands and either hand classify like upright ones.
-- **✍️ My signs** — record 3 samples per letter with your own hand and
-  the app classifies with a weighted k-NN model instead (covers any
-  letter you teach it). The model auto-saves in your browser
-  (localStorage).
+- **Learns from every signer (no training needed)** — confident holds
+  are stored in a small in-browser database (`db.js`, IndexedDB), grouped
+  per letter, deduped and capped per letter. The collection *is* the
+  classifier: a weighted k-NN over the accumulated samples that joins the
+  neural net and rules as a third engine, so recognition gets better the
+  more someone uses the app — for their own hand, their own way.
+- **Pre-trained seed** — the owner trains once with the ✋ *Train the
+  shared hand model* tool, clicks **⬇ Export learned DB**, ships the JSON
+  as `seed-db.json` (or embeds it), and every visitor starts with that
+  model already loaded — they just sign like normal. The app ships as
+  one self-contained file too: `node tools/build-single.mjs` builds
+  `signtype.html` with all code and the seed DB inlined.
 - **Three practice modes** — Free type, Alphabet drill with progress
   bar, and editable Phrase drill.
 
@@ -45,6 +53,7 @@ node classifier.test.js   # rule-based classifier (incl. tilt invariance)
 node knn.test.js          # k-NN canonicalization + accuracy
 node vote.test.js         # temporal smoothing voter
 node net.test.js          # neural model structure + forward-pass integrity
+node db.test.js           # learning library: dedupe, caps, seed export/import
 ```
 
 ## Retraining / model provenance

@@ -4,10 +4,13 @@
    Recognition engines:
      - neural (net.js + asl-net.json): a CNN trained on the public
        Sign Language MNIST dataset — the default engine for static
-       letters in Free/Alphabet/Phrase modes. Covers A-Y incl. N/P/Q.
-     - rules (asl.js): kept as a fallback when the net is unsure, and
-       for open-hand space and J/Z motion tracing.
-     - k-NN (knn.js): user-trained model in the "My signs" mode. */
+       letters. Covers A-Y incl. N/P/Q.
+     - rules (asl.js): a fallback when the net is unsure, plus
+       open-hand space and J/Z motion tracing.
+     - learned (db.js + knn.js): an in-browser database of sign samples
+       collected automatically from every confident hold, grouped per
+       letter and classified with k-NN. It gets better the more the app
+       is used, and a shipped seed DB means new users start pre-trained. */
 "use strict";
 
 (function () {
@@ -21,25 +24,23 @@
   const drillEl = $("drill"), drillTarget = $("drill-target"), drillBar = $("drill-bar");
   const phraseRow = $("phrase-row"), phraseInput = $("phrase-input"), phraseStart = $("phrase-start");
   const copyBtn = $("copy-btn"), clearBtn = $("clear-btn"), soundToggle = $("sound-toggle");
-  const trainPanel = $("train-panel"), tabRecord = $("tab-record"), tabPractice = $("tab-practice");
-  const recordView = $("record-view"), practiceView = $("practice-view");
-  const trainBig = $("train-big"), trainTargetName = $("train-target-name"), trainDots = $("train-dots");
-  const trainGrid = $("train-grid"), captureBtn = $("capture-btn"), skipBtn = $("skip-btn");
-  const undoBtn = $("undo-btn"), clearModelBtn = $("clear-model-btn");
-  const practiceLive = $("practice-live"), practiceReady = $("practice-ready"), trainFoot = $("train-foot");
+  const seedTrain = $("seed-train"), seedSummary = $("seed-summary");
+  const seedBig = $("seed-big"), seedName = $("seed-name"), seedDots = $("seed-dots");
+  const seedPrev = $("seed-prev"), seedNext = $("seed-next");
+  const seedExport = $("seed-export"), seedImport = $("seed-import");
+  const seedImportFile = $("seed-import-file"), seedClear = $("seed-clear");
 
   // ---------------- constants ----------------
   const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const MODEL_KEY = "signtype-knn-model-v1";
-  const NET_CONF_MIN = 0.6;    // neural engine: act on a class only above this
+  const LEGACY_MODEL_KEY = "signtype-knn-model-v1"; // My-signs model, migrated once
+  const NET_CONF_MIN = 0.6;     // neural engine: act on a class only above this
+  const COLLECT_CONF = 0.75;    // auto-collect a sample only when the net is this sure
   const NET_ONLY = new Set(["N", "P", "Q"]); // letters the rules can't produce
-  const REC_GOAL = 3;          // guided recording stops here and auto-advances
-  const REC_MAX = 8;           // hard cap of samples per letter
-  const CONF_MIN = 0.55;       // k-NN confidence gate (0..1)
-  const NN_MAX = 1.2;          // k-NN nearest-neighbor distance gate (unknown poses)
-  const STEADY_RMS = 0.06;     // canonical per-coordinate jitter below this = steady
-  const STEADY_MS = 600;       // hold steady this long to auto-record a sample
-  const CAP_GAP_MS = 900;      // minimum gap between recorded samples
+  const CONF_MIN = 0.55;        // learned k-NN confidence gate (0..1)
+  const NN_MAX = 1.2;           // learned k-NN nearest-neighbor distance gate
+  const SEED_URL = "seed-db.json";
+  const SEED_GOAL = 5;          // seed trainer: dots shown per letter (soft target)
+  const MAX_DOTS = 8;           // cap dots rendered per letter
 
   // ---------------- state ----------------
   const state = {
@@ -50,7 +51,6 @@
     phrasePos: 0,
     phraseWrong: new Set(),
     celebration: 0,
-    trainTab: "record",        // "record" | "practice"
   };
   // Drill walks the neural engine's static letters (A-Y minus motion J/Z),
   // so N, P and Q are included — they were undetectable under pure rules.
@@ -64,21 +64,19 @@
   let soundOn = true, audioCtx = null;
   let frameCount = 0, fps = 0, fpsTimer = performance.now();
   let noHandFrames = 0;
-  let lastFeatures = null;
   let lastGlyph = null, lastCls = null, flashAt = 0;
 
   // ---- neural engine state (net.js + asl-net.json) ----
   let netModel = null;
   let netStatus = "loading";   // "loading" | "ready" | "error"
 
-  // ---- train-your-own model state ----
-  let model = new KNN.Model({ k: 7, minSamples: 2 });
-  let trainTarget = "A";
-  let trainCells = {};                 // letter -> cell element
-  let prevVec = null;                  // previous frame's canonical vector
-  let lastVec = null;                  // latest canonical vector (manual capture)
-  let recArmed = true, recSteadySince = 0, lastCapAt = 0;
-  let footTimer = null;
+  // ---- learning library state (db.js) ----
+  let library = new LEARN.Library();
+  let learnedModel = library.toModel();
+  let learnDirty = false;
+  let saveTimer = null;
+  let seedTarget = "A";
+  let seedMsgTimer = null;
   let clearArmed = false, clearTimer = null;
 
   const REL_BADGE = { solid: "reliable", approx: "approx", motion: "trace it", no: "not detected" };
@@ -116,20 +114,6 @@
     guideGridEl.appendChild(cell);
   }
 
-  for (const ch of ALPHABET) {
-    const cell = document.createElement("div");
-    cell.className = "train-cell";
-    cell.innerHTML = `<span class="tc-letter">${ch}</span><span class="tc-n"></span>`;
-    cell.addEventListener("click", () => {
-      if (state.trainTab === "practice") setTrainTab("record");
-      trainTarget = ch;
-      renderTrainUI();
-      resetRecorder();
-    });
-    trainCells[ch] = cell;
-    trainGrid.appendChild(cell);
-  }
-
   // ---------------- status / helpers ----------------
   function setStatus(text, isError) {
     statusEl.textContent = text;
@@ -140,13 +124,6 @@
     stableLetter = null;
     stableSince = 0;
     holdTyped = false;
-    lastFeatures = null;
-  }
-
-  function resetRecorder() {
-    recArmed = true;
-    recSteadySince = 0;
-    prevVec = null;
   }
 
   function tickSound(freq) {
@@ -167,170 +144,166 @@
     } catch (e) { /* audio not allowed yet */ }
   }
 
-  // ---------------- model persistence ----------------
-  function saveModel() {
-    try { localStorage.setItem(MODEL_KEY, JSON.stringify(model.toJSON())); }
-    catch (e) { console.warn("Could not save model:", e); }
+  // ---------------- learning library ----------------
+  /* Persist the library (debounced) to IndexedDB — the in-browser DB. */
+  function scheduleSave() {
+    if (saveTimer) return;
+    saveTimer = setTimeout(async () => {
+      saveTimer = null;
+      try { await LEARN.saveToIDB(library); }
+      catch (e) { console.warn("Could not save learning library:", e); }
+    }, 800);
   }
 
-  function loadModel() {
+  /* Add one sample to the library and refresh the learned model. */
+  function collectSample(letter, vec) {
+    if (!letter || letter === " " || !vec) return;
+    const res = library.add(letter, vec, Date.now());
+    if (res.added) {
+      learnedModel = library.toModel();
+      learnDirty = true;
+      scheduleSave();
+      renderSeed();
+    }
+  }
+
+  /* Load order: legacy My-signs model (migrate once) -> this browser's
+     DB -> the shipped seed DB (single-file build inlines it, otherwise
+     fetched next to the app). Everything merges; dedupe keeps it clean. */
+  async function initLearn() {
     try {
-      const raw = localStorage.getItem(MODEL_KEY);
-      if (!raw) return;
-      const loaded = KNN.Model.fromJSON(JSON.parse(raw));
-      if (loaded.total > 0) {
-        model = loaded;
-        console.log("Loaded saved My-signs model:", model.total, "samples");
-      }
-    } catch (e) { console.warn("Could not load saved model:", e); }
-  }
-
-  // ---------------- train UI ----------------
-  function flashFoot(msg, ok = true) {
-    trainFoot.innerHTML = `<span class="${ok ? "ok" : "bad"}">${msg}</span>`;
-    if (footTimer) clearTimeout(footTimer);
-    footTimer = setTimeout(renderTrainUI, 2600);
-  }
-
-  function renderTrainUI() {
-    const counts = model.counts();
-    const got = counts[trainTarget] || 0;
-
-    // target header
-    trainBig.textContent = trainTarget;
-    const desc = ASL.LETTERS[trainTarget].desc;
-    if (got >= REC_GOAL) {
-      trainTargetName.innerHTML =
-        `<b>${trainTarget}</b> has ${got} samples — enough. Click a letter below to add more, ` +
-        `or press <b>Skip ➜</b> for the next one that still needs samples.`;
-    } else {
-      const n = got + 1;
-      const p = n === 1 ? "st" : n === 2 ? "nd" : "rd";
-      trainTargetName.innerHTML =
-        `Sign <b>${trainTarget}</b> — hold it steady and it records itself ` +
-        `(sample ${n}${p} of ${REC_GOAL}). ${desc}`;
-    }
-    let dots = "";
-    for (let i = 0; i < REC_GOAL; i++) {
-      dots += `<span class="train-dot${i < Math.min(got, REC_GOAL) ? " fill" : ""}"></span>`;
-    }
-    if (got > REC_GOAL) dots += `<span class="tc-extra">+${got - REC_GOAL}</span>`;
-    trainDots.innerHTML = dots;
-
-    // letter grid
-    for (const ch of ALPHABET) {
-      const cell = trainCells[ch];
-      const c = counts[ch] || 0;
-      cell.classList.toggle("sel", ch === trainTarget);
-      cell.classList.toggle("have", c > 0);
-      cell.classList.toggle("done", c >= REC_GOAL);
-      cell.querySelector(".tc-n").textContent = c > 0 ? c : "";
-    }
-
-    // footer + practice-ready line
-    const ready = model.activeLetters();
-    practiceReady.textContent = "ready: " + (ready.join(" ") || "none yet — record in the Record tab");
-    const allDone = ALPHABET.split("").every((ch) => (counts[ch] || 0) >= REC_GOAL);
-    if (allDone) {
-      trainFoot.innerHTML = `<span class="ok">🎉 All 26 letters have ${REC_GOAL}+ samples. Switch to Practice and sign!</span>`;
-    } else if (model.total === 0) {
-      trainFoot.innerHTML = `<span class="bad">Your model is empty — sign the <b>${trainTarget}</b> shown above and hold still.</span>`;
-    } else {
-      trainFoot.innerHTML =
-        `<span class="ok">💾 auto-saved in this browser</span>` +
-        `<span>${model.total} samples · ${ready.length}/26 letters ready</span>` +
-        `<span class="muted">undo or clear to fix mistakes</span>`;
-    }
-    if (footTimer) { clearTimeout(footTimer); footTimer = null; } // a fresh render wins over flash
-  }
-
-  function setTrainTab(tab) {
-    state.trainTab = tab;
-    tabRecord.classList.toggle("active", tab === "record");
-    tabPractice.classList.toggle("active", tab === "practice");
-    recordView.classList.toggle("hidden", tab !== "record");
-    practiceView.classList.toggle("hidden", tab !== "practice");
-    resetRecorder();
-    if (tab === "practice") {
-      const ready = model.activeLetters();
-      practiceLive.className = "practice-live dim";
-      practiceLive.textContent = ready.length
-        ? "Hold a sign from your model and it types it below."
-        : "No letters ready yet — record at least 2 samples per letter, then come back here.";
-    }
-  }
-
-  function selectCaptureButton() {
-    if (!lastVec) { flashFoot("Show your hand in the camera first", false); return; }
-    if ((model.counts()[trainTarget] || 0) >= REC_MAX) {
-      flashFoot(`Max ${REC_MAX} samples for ${trainTarget} — undo or clear some first`, false);
-      return;
-    }
-    captureSample(lastVec, performance.now());
-  }
-
-  function advanceTarget(announce) {
-    const counts = model.counts();
-    const need = ALPHABET.split("").filter((ch) => (counts[ch] || 0) < REC_GOAL);
-    if (!need.length) {
-      flashFoot("🎉 All letters trained — switch to Practice!");
-      renderTrainUI();
-      return;
-    }
-    const idx = ALPHABET.indexOf(trainTarget);
-    for (let i = 1; i <= 26; i++) {
-      const ch = ALPHABET[(idx + i) % 26];
-      if ((counts[ch] || 0) < REC_GOAL) { trainTarget = ch; break; }
-    }
-    renderTrainUI();
-    if (announce) flashFoot(`Next up: ${trainTarget} — sign it and hold steady`);
-  }
-
-  // ---------------- capture logic ----------------
-  function rmsDiff(a, b) {
-    let sum = 0;
-    for (let i = 0; i < a.length; i++) { const t = a[i] - b[i]; sum += t * t; }
-    return Math.sqrt(sum / a.length);
-  }
-
-  /* Feed one frame's canonical vector into the steady-hold detector.
-     A steady hold of STEADY_MS auto-records one sample for the target;
-     the hand must move again (or leave frame) before another can record. */
-  function captureTick(vec, now) {
-    if (!vec) return;
-    if (prevVec) {
-      const rms = rmsDiff(prevVec, vec);
-      if (rms > STEADY_RMS) {
-        recSteadySince = 0;
-        recArmed = true;
-      } else if (recArmed && now - lastCapAt >= CAP_GAP_MS &&
-                 (model.counts()[trainTarget] || 0) < REC_GOAL) {
-        if (recSteadySince === 0) {
-          recSteadySince = now;
-        } else if (now - recSteadySince >= STEADY_MS) {
-          captureSample(vec, now);
+      const raw = localStorage.getItem(LEGACY_MODEL_KEY);
+      if (raw) {
+        const legacy = KNN.Model.fromJSON(JSON.parse(raw));
+        let n = 0;
+        for (const s of legacy.samples) {
+          if (library.add(s.letter, s.v, Date.now()).added) n++;
         }
+        localStorage.removeItem(LEGACY_MODEL_KEY);
+        if (n) console.log("Migrated", n, "legacy My-signs samples into the learning library");
       }
-    }
-    prevVec = vec;
+    } catch (e) { console.warn("Could not migrate legacy model:", e); }
+
+    try { await LEARN.loadFromIDB(library); }
+    catch (e) { console.warn("Could not load learning library:", e); }
+
+    try {
+      if (window.SEED_DB) loadSeed(window.SEED_DB, "bundled seed");
+      else {
+        const res = await fetch(SEED_URL);
+        if (res.ok) loadSeed(await res.json(), SEED_URL);
+      }
+    } catch (e) { /* no seed shipped — fine */ }
+
+    learnedModel = library.toModel();
+    learnDirty = true;
+    renderSeed();
+    scheduleSave();
   }
 
-  function captureSample(vec, now) {
-    const letter = trainTarget;
-    const before = model.counts()[letter] || 0;
-    lastCapAt = now;
-    recArmed = false;          // must move the hand before the next capture
-    recSteadySince = 0;
-    model.add(letter, vec);
-    saveModel();
-    tickSound(520 + Math.min(before, 3) * 130);
-    if (before + 1 >= REC_GOAL) {
-      tickSound(880);
-      setTimeout(() => tickSound(1175), 110);
+  function loadSeed(json, label) {
+    if (!json || !json.samples || !json.samples.length) return;
+    try {
+      const seed = LEARN.Library.fromJSON(json);
+      const added = LEARN.mergeInto(library, seed);
+      if (added) console.log("Seed DB", label, "added", added, "samples");
+    } catch (e) { console.warn("Bad seed DB (" + label + "):", e); }
+  }
+
+  // ---------------- seed trainer UI ----------------
+  function renderSeed() {
+    if (!seedSummary) return;
+    const lc = library.counts();
+    const letters = Object.keys(lc).length;
+    const got = lc[seedTarget] || 0;
+    seedSummary.textContent = `${library.total} samples · ${letters}/26 letters`;
+
+    seedBig.textContent = seedTarget;
+    seedName.innerHTML =
+      `<b>${seedTarget}</b> · ${ASL.LETTERS[seedTarget].desc} — ` +
+      (got >= SEED_GOAL
+        ? `${got} samples, good. Keep adding variety or move on.`
+        : `sign it and hold steady; each hold records (${got} so far).`);
+
+    let dots = "";
+    const n = Math.min(got, MAX_DOTS);
+    for (let i = 0; i < n; i++) dots += `<span class="seed-dot fill"></span>`;
+    if (got > MAX_DOTS) dots += `<span class="tc-extra">+${got - MAX_DOTS}</span>`;
+    seedDots.innerHTML = dots;
+  }
+
+  function flashSeed(msg, ok = true) {
+    seedSummary.textContent = msg;
+    seedSummary.style.color = ok ? "var(--good)" : "var(--bad)";
+    if (seedMsgTimer) clearTimeout(seedMsgTimer);
+    seedMsgTimer = setTimeout(() => {
+      seedSummary.style.color = "";
+      renderSeed();
+    }, 2600);
+  }
+
+  function stepSeed(dir) {
+    const idx = ALPHABET.indexOf(seedTarget);
+    seedTarget = ALPHABET[(idx + dir + 26) % 26];
+    renderSeed();
+  }
+
+  seedPrev.addEventListener("click", () => stepSeed(-1));
+  seedNext.addEventListener("click", () => stepSeed(1));
+
+  seedExport.addEventListener("click", () => {
+    const json = LEARN.exportJSON(library);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "signtype-learn-db.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    flashSeed(`Exported ${library.total} samples — ship this as seed-db.json`);
+  });
+
+  seedImport.addEventListener("click", () => seedImportFile.click());
+  seedImportFile.addEventListener("change", async () => {
+    const file = seedImportFile.files && seedImportFile.files[0];
+    seedImportFile.value = "";
+    if (!file) return;
+    try {
+      const seed = LEARN.importJSON(await file.text());
+      const added = LEARN.mergeInto(library, seed);
+      learnedModel = library.toModel();
+      learnDirty = true;
+      scheduleSave();
+      renderSeed();
+      flashSeed(`Imported ${seed.total} samples (${added} new to this browser)`);
+    } catch (e) {
+      flashSeed("Import failed — not a SignType learning DB", false);
     }
-    renderTrainUI();
-    if (before + 1 >= REC_GOAL) advanceTarget(false);
-    else flashFoot(`${letter} sample ${before + 1}/${REC_GOAL} recorded 💾`);
+  });
+
+  seedClear.addEventListener("click", () => {
+    if (!clearArmed) {
+      clearArmed = true;
+      seedClear.classList.add("armed");
+      seedClear.textContent = "Really clear?";
+      clearTimer = setTimeout(disarmClear, 2600);
+      return;
+    }
+    disarmClear();
+    library.clear();
+    learnedModel = library.toModel();
+    learnDirty = true;
+    scheduleSave();
+    renderSeed();
+    flashSeed("Learning library cleared in this browser");
+  });
+  function disarmClear() {
+    clearArmed = false;
+    seedClear.classList.remove("armed");
+    seedClear.textContent = "🗑 Clear";
+    if (clearTimer) { clearTimeout(clearTimer); clearTimer = null; }
   }
 
   // ---------------- typing ----------------
@@ -347,7 +320,7 @@
     tickSound(letter === " " ? 240 : 660);
 
     // apply to the active mode
-    if (state.mode === "free" || state.mode === "train") {
+    if (state.mode === "free") {
       state.typed += letter;
       updateOutputUI();
     } else if (state.mode === "alphabet") {
@@ -390,11 +363,9 @@
       k.classList.toggle("done", inDrill && DRILL_SEQ.indexOf(ch) < state.drillIdx);
     });
 
-    if (state.mode === "free" || state.mode === "train") {
+    if (state.mode === "free") {
       typedBox.textContent = state.typed + "▍";
-      typedSub.textContent = state.mode === "train"
-        ? state.typed.length + " chars · your model"
-        : state.typed.length + " chars";
+      typedSub.textContent = state.typed.length + " chars";
     } else if (state.mode === "alphabet") {
       typedBox.innerHTML = DRILL_SEQ.map((ch, i) =>
         `<span class="${i < state.drillIdx ? "done" : i === state.drillIdx ? "target" : "muted"}">${ch}</span>`
@@ -437,58 +408,15 @@
       document.querySelectorAll(".mode-btn").forEach((b) =>
         b.classList.toggle("active", b === btn));
       state.mode = btn.dataset.mode;
-      drillEl.classList.toggle("hidden", state.mode === "free" || state.mode === "train");
+      drillEl.classList.toggle("hidden", state.mode === "free");
       phraseRow.classList.toggle("hidden", state.mode !== "phrase");
-      keyboardEl.classList.toggle("hidden", state.mode === "train");
-      trainPanel.classList.toggle("hidden", state.mode !== "train");
+      keyboardEl.classList.remove("hidden");
       if (state.mode === "phrase") phraseInput.value = state.phrase;
-      if (state.mode === "train") {
-        renderTrainUI();
-        setTrainTab(state.trainTab);
-      }
       resetDrill();
       resetStability();
       voter.clear();
     });
   });
-
-  tabRecord.addEventListener("click", () => setTrainTab("record"));
-  tabPractice.addEventListener("click", () => setTrainTab("practice"));
-  captureBtn.addEventListener("click", selectCaptureButton);
-  skipBtn.addEventListener("click", () => advanceTarget(true));
-
-  undoBtn.addEventListener("click", () => {
-    const removed = model.removeLast();
-    if (!removed) { flashFoot("Nothing to undo yet", false); return; }
-    trainTarget = removed.letter;
-    saveModel();
-    resetRecorder();
-    renderTrainUI();
-    flashFoot(`Removed one ${removed.letter} sample (${model.counts()[removed.letter] || 0} left)`);
-  });
-
-  clearModelBtn.addEventListener("click", () => {
-    if (!clearArmed) {
-      clearArmed = true;
-      clearModelBtn.classList.add("armed");
-      clearModelBtn.textContent = "Really clear?";
-      clearTimer = setTimeout(disarmClear, 2600);
-      return;
-    }
-    disarmClear();
-    model.clear();
-    saveModel();
-    trainTarget = "A";
-    resetRecorder();
-    renderTrainUI();
-    flashFoot("Model cleared — start recording fresh");
-  });
-  function disarmClear() {
-    clearArmed = false;
-    clearModelBtn.classList.remove("armed");
-    clearModelBtn.textContent = "🗑 Clear";
-    if (clearTimer) { clearTimeout(clearTimer); clearTimer = null; }
-  }
 
   phraseStart.addEventListener("click", () => {
     const p = (phraseInput.value || "").toUpperCase().trim();
@@ -502,7 +430,7 @@
   });
 
   copyBtn.addEventListener("click", async () => {
-    const text = (state.mode === "free" || state.mode === "train") ? state.typed
+    const text = state.mode === "free" ? state.typed
       : state.mode === "phrase" ? state.phrase
       : DRILL_SEQ.join("");
     try {
@@ -515,7 +443,7 @@
   });
 
   clearBtn.addEventListener("click", () => {
-    if (state.mode === "free" || state.mode === "train") {
+    if (state.mode === "free") {
       state.typed = "";
       updateOutputUI();
     } else {
@@ -592,6 +520,50 @@
     return NET.predict(netModel, v);
   }
 
+  /* The three-engine decision. Returns:
+       { letter, via, conf, vec, hint }
+     letter: the chosen letter or null; via: "net" | "rules" | "learned";
+     vec: canonical vector for collection; hint: what to show when unsure.
+     Rules stay in charge unless the net is confident AND (rules agree,
+     rules are silent, the letter is net-only N/P/Q, or the learned DB —
+     which knows this user's hand — backs the net). The learned DB is
+     also the final fallback for letters the net hasn't learned well. */
+  function classifyFrame(flat, feats) {
+    const rulesLetter = ASL.classify(feats);
+    const nres = predictNet(flat);
+    const vec = KNN.canonicalize(flat);
+    let learned = null;
+    if (vec) learned = learnedModel.classify(vec);
+    const learnedOk = !!(learned && learned.letter &&
+      learned.conf >= CONF_MIN && learned.nn <= NN_MAX);
+
+    if (nres) {
+      const netOnly = NET_ONLY.has(nres.letter);
+      if (nres.conf >= NET_CONF_MIN) {
+        const agreeRules = rulesLetter === nres.letter;
+        const agreeLearned = learnedOk && learned.letter === nres.letter;
+        if (netOnly || agreeRules || !rulesLetter || agreeLearned) {
+          return { letter: nres.letter, via: "net", conf: nres.conf, vec,
+            hint: `${nres.letter} · ${Math.round(nres.conf * 100)}% confident — hold to type` };
+        }
+      }
+    }
+    if (rulesLetter) {
+      return { letter: rulesLetter, via: "rules", conf: 0, vec,
+        hint: ASL.LETTERS[rulesLetter].desc };
+    }
+    if (learnedOk) {
+      return { letter: learned.letter, via: "learned", conf: learned.conf, vec,
+        hint: `your ${learned.letter} · learned from ${library.counts()[learned.letter] || 0} samples — hold to type` };
+    }
+    let hint = "Not recognized — check the guide";
+    if (nres) hint = `Net: ${nres.letter} at ${Math.round(nres.conf * 100)}% — hold still or adjust your hand`;
+    else if (learned && learned.letter) {
+      hint = `Learned ${learned.letter} only ${Math.round(learned.conf * 100)}% — hold still or add samples`;
+    }
+    return { letter: null, via: "none", conf: 0, vec, hint };
+  }
+
   function onResults(results) {
     frameCount++;
     const now = performance.now();
@@ -612,13 +584,7 @@
       voter.push(null); // decay the vote while the hand is gone
       if (noHandFrames > 12) handHint.classList.add("show");
       resetStability();
-      prevVec = null;
-      lastVec = null;
-      recSteadySince = 0;
-      const noHandMsg = state.mode === "train"
-        ? "Show a hand to record or practice"
-        : "Hold a sign steady to type it";
-      setCurrentDisplay("—", "", noHandMsg);
+      setCurrentDisplay("—", "", "Hold a sign steady to type it");
       featuresEl.innerHTML = "";
       document.querySelectorAll(".key").forEach((k) => k.classList.remove("active"));
     }
@@ -643,112 +609,35 @@
     currentNameEl.textContent = name;
   }
 
-  // ---- train-mode frame: k-NN recognition + guided recording ----
-  function processTrainFrame(flat, now) {
-    const vec = KNN.canonicalize(flat);
-    lastVec = vec;
-    let res = null, letter = null, glyph = "—", cls = "", name = "Hand not tracked";
-
-    if (vec) {
-      res = model.classify(vec);
-      const confident = res.letter && res.conf >= CONF_MIN && res.nn <= NN_MAX;
-      letter = confident ? res.letter : null;
-      if (letter) {
-        glyph = letter;
-        cls = "trained";
-        name = `Your ${letter} · ${Math.round(res.conf * 100)}% confident — hold to type`;
-      } else {
-        glyph = "?";
-        cls = "unknown";
-        name = model.activeLetters().length
-          ? `Not confident (${res.letter ? Math.round(res.conf * 100) + "%" : "no samples close"}) — hold still or record more`
-          : "No trained letters yet — record samples first";
-      }
-    } else {
-      lastVec = null;
-    }
-
-    // recording happens only in the Record tab and only for the target letter
-    if (state.trainTab === "record" && vec) captureTick(vec, now);
-
-    // live model opinion (visible under Practice)
-    if (res && res.letter) {
-      practiceLive.textContent = letter
-        ? `Sees ${res.letter} · ${Math.round(res.conf * 100)}% — hold steady to type`
-        : `${res.letter}? only ${Math.round(res.conf * 100)}% — hold still or add more samples`;
-      practiceLive.className = "practice-live" + (letter ? "" : " warn");
-    }
-
-    return { typedLetter: letter, glyph, cls, name };
-  }
-
   function processFrame(lm, now) {
     const flat = lm.map((p) => [p.x, p.y, p.z]);
     const feats = ASL.analyze(flat);
-    lastFeatures = feats;
-    const trainMode = state.mode === "train";
+    const read = classifyFrame(flat, feats);
 
     let typedLetter = null;
-    let glyph = "?", cls = "unknown", name = "Not recognized — check the guide";
+    let glyph = "?", cls = "unknown", name = read.hint;
 
-    if (trainMode) {
-      const out = processTrainFrame(flat, now);
-      typedLetter = out.typedLetter;
-      glyph = out.glyph;
-      cls = out.cls;
-      name = out.name;
-    } else {
-      // index-tip trail for J / Z
-      if (feats.ext.index && !feats.ext.middle && !feats.ext.ring && !feats.ext.pinky) {
-        motionPath.push({ x: lm[ASL.L.INDEX_TIP].x, y: lm[ASL.L.INDEX_TIP].y, t: now });
-      }
-      while (motionPath.length && now - motionPath[0].t > 1500) motionPath.shift();
-
-      // ---- what is the hand signing right now? ----
-      const openHand = feats.pattern === "1111" && feats.thumbOut;
-      if (openHand) {
-        typedLetter = " "; // " " => space
-        glyph = "5"; cls = "space";
-        name = "open hand · types space";
-      } else {
-        // Engines: the neural net (trained on the public ASL Alphabet
-        // dataset, covers all static letters incl. N/P/Q) and the tested
-        // rule classifier. The net only types when it is confident AND it
-        // agrees with the rules, the rules are silent, or it claims a
-        // letter the rules cannot produce (N/P/Q) — so the neural engine
-        // can only add letters, never override a rules reading.
-        const rulesLetter = ASL.classify(feats);
-        const nres = predictNet(lm);
-        let letter = null, via = "rules", confPct = 0;
-        if (nres) {
-          const netConfident = nres.conf >= NET_CONF_MIN;
-          const netOnly = NET_ONLY.has(nres.letter);
-          const agree = rulesLetter === nres.letter;
-          if (netConfident && (netOnly || agree || !rulesLetter)) {
-            letter = nres.letter;
-            via = "net";
-            confPct = nres.conf;
-          } else if (rulesLetter) {
-            letter = rulesLetter;
-          } else {
-            glyph = "?"; cls = "unknown";
-            name = `Net: ${nres.letter} at ${Math.round(nres.conf * 100)}% — hold still or adjust your hand`;
-          }
-        } else {
-          letter = rulesLetter; // net unavailable (offline): rules as before
-        }
-        if (letter) {
-          typedLetter = letter;
-          glyph = letter; cls = "";
-          name = via === "net"
-            ? `${letter} · ${Math.round(confPct * 100)}% confident — hold to type`
-            : ASL.LETTERS[letter].desc;
-        }
-      }
-
-      // ---- motion letters (J / Z) ----
-      evaluateMotion(feats, now);
+    // index-tip trail for J / Z (motion letters are rule-based)
+    if (feats.ext.index && !feats.ext.middle && !feats.ext.ring && !feats.ext.pinky) {
+      motionPath.push({ x: lm[ASL.L.INDEX_TIP].x, y: lm[ASL.L.INDEX_TIP].y, t: now });
     }
+    while (motionPath.length && now - motionPath[0].t > 1500) motionPath.shift();
+
+    // ---- what is the hand signing right now? ----
+    const openHand = feats.pattern === "1111" && feats.thumbOut;
+    if (openHand) {
+      typedLetter = " "; // " " => space
+      glyph = "5"; cls = "space";
+      name = "open hand · types space";
+    } else if (read.letter) {
+      typedLetter = read.letter;
+      glyph = read.letter;
+      cls = read.via === "learned" ? "learned" : "";
+      name = read.hint;
+    }
+
+    // ---- motion letters (J / Z) ----
+    evaluateMotion(feats, now);
 
     // ---- temporal smoothing ----
     // Per-frame recognition flickers between look-alike letters (A/S/E,
@@ -763,9 +652,7 @@
         // mid-transition: the vote still points at the previous letter
         glyph = voted === " " ? "5" : voted;
         cls = voted === " " ? "space" : "";
-        name = trainMode
-          ? "holding your " + voted + " — keep still"
-          : voted === " " ? "open hand · types space" : ASL.LETTERS[voted].desc;
+        name = voted === " " ? "open hand · types space" : ASL.LETTERS[voted].desc;
       }
     } else if (rawLetter !== null) {
       // hand visible but no majority yet (switching letters)
@@ -781,9 +668,8 @@
         k.dataset.letter === (typedLetter === " " ? "SPACE" : typedLetter));
     });
 
-    // ---- stability → type (disabled while recording samples) ----
-    const allowTyping = !(trainMode && state.trainTab === "record");
-    if (allowTyping && typedLetter !== null) {
+    // ---- stability → type ----
+    if (typedLetter !== null) {
       if (typedLetter === stableLetter && !holdTyped) {
         if (stableSince === 0) stableSince = now;
         const canType = now - lastMotionType > 800 &&
@@ -795,6 +681,15 @@
           holdTyped = true; // one letter per hold
         }
       } else if (typedLetter !== stableLetter) {
+        // hold just started: the vote majority is solid, so this is a
+        // good moment to learn from the sign
+        if (rawLetter !== null && rawLetter === typedLetter && typedLetter !== " ") {
+          if (read.via === "net" && read.conf >= COLLECT_CONF) {
+            collectSample(typedLetter, read.vec); // automatic learning
+          } else if (seedTrain.open && typedLetter === seedTarget) {
+            collectSample(typedLetter, read.vec); // deliberate seed training
+          }
+        }
         stableLetter = typedLetter;
         stableSince = now;
         holdTyped = false;
@@ -822,29 +717,25 @@
   }
 
   function renderFeatures(feats) {
-    if (state.mode === "train") {
-      const ready = model.activeLetters().join("");
-      featuresEl.innerHTML =
-        `<span class="f-label">model</span> ${model.total} samples` +
-        `<span class="f-label">· ready</span> ${ready || "—"}` +
-        `<span class="f-fps">${fps} fps</span>`;
-      return;
-    }
     const names = ["index", "middle", "ring", "pinky"];
     const dots = names.map((n) =>
       `<span class="f-${feats.ext[n] ? "on" : "off"}" title="${n}">${feats.ext[n] ? "●" : "○"}</span>`).join("");
     const thumb = `<span class="f-${feats.thumbOut ? "on" : "off"}" title="thumb">${feats.thumbOut ? "●" : "○"}</span>`;
     const engine = netStatus === "ready" ? "🧠 neural" : netStatus === "error" ? "rules" : "🧠 loading…";
+    const learned = library.total
+      ? `<span class="f-label">· learned</span> ${library.total}/${Object.keys(library.counts()).length}`
+      : "";
     featuresEl.innerHTML =
       `<span class="f-label">pattern ${feats.pattern}</span> ${dots}${thumb}` +
       `<span class="f-label">· thumb ${feats.thumbOut ? "out" : "folded"}</span>` +
+      learned +
       `<span class="f-fps">${engine} · ${fps} fps</span>`;
   }
 
   // ---------------- go ----------------
-  loadModel();
-  renderTrainUI();
+  renderSeed();
   updateOutputUI();
   initNet();
+  initLearn();
   initCamera();
 })();

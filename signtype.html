@@ -1,0 +1,2113 @@
+<!--
+  SignType — ASL letter practice
+  Copyright © 2026 [Your Full Name]. All rights reserved.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SignType — ASL letter practice</title>
+<style>
+/*
+  SignType — ASL letter practice
+  Copyright © 2026 [Your Full Name]. All rights reserved.
+*/
+
+:root {
+  --bg: #0b1020;
+  --card: #141b30;
+  --card-2: #1a2340;
+  --line: #26304e;
+  --text: #e8ecf8;
+  --muted: #8b95b5;
+  --accent: #22d3ee;
+  --accent-2: #f472b6;
+  --good: #34d399;
+  --warn: #fbbf24;
+  --bad: #f87171;
+  --radius: 14px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  color: var(--text);
+  min-height: 100vh;
+  background:
+    radial-gradient(1100px 700px at 75% -10%, #1c2a55 0%, transparent 55%),
+    radial-gradient(900px 600px at -10% 110%, #241a3f 0%, transparent 55%),
+    var(--bg);
+}
+
+.hidden { display: none !important; }
+.muted { color: var(--muted); font-weight: normal; }
+
+/* ---------- top bar ---------- */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(11, 16, 32, 0.7);
+  backdrop-filter: blur(6px);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-icon { font-size: 22px; }
+.brand-name { font-size: 20px; font-weight: 800; letter-spacing: 0.5px; }
+.tagline { color: var(--muted); font-size: 13px; }
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.icon-btn {
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 15px;
+}
+.icon-btn:hover { border-color: var(--accent); }
+.status {
+  font-size: 13px;
+  color: var(--good);
+  background: rgba(52, 211, 153, 0.08);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  border-radius: 999px;
+  padding: 5px 12px;
+  white-space: nowrap;
+}
+.status.error { color: var(--bad); background: rgba(248, 113, 113, 0.08); border-color: rgba(248, 113, 113, 0.35); }
+
+/* ---------- layout ---------- */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 5fr) minmax(340px, 4fr);
+  gap: 18px;
+  padding: 18px 22px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+@media (max-width: 900px) {
+  .layout { grid-template-columns: 1fr; }
+}
+
+.card {
+  background: linear-gradient(180deg, var(--card-2), var(--card));
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+/* ---------- camera ---------- */
+.video-wrap {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #05070f;
+  border: 1px solid var(--line);
+}
+.video-wrap video, .video-wrap canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.hand-hint {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(11, 16, 32, 0.85);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-size: 15px;
+  color: var(--muted);
+  opacity: 0;
+  transition: opacity 0.25s;
+  pointer-events: none;
+  animation: pulse 2s infinite;
+}
+.hand-hint.show { opacity: 1; }
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.25); }
+  50% { box-shadow: 0 0 0 12px rgba(34, 211, 238, 0); }
+}
+.camera-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  background: rgba(11, 16, 32, 0.92);
+  padding: 20px;
+}
+.camera-error-title { font-weight: 700; font-size: 17px; margin: 0; }
+.camera-error-hint { color: var(--muted); font-size: 13px; margin: 0; max-width: 420px; line-height: 1.5; }
+.feature-strip {
+  margin-top: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 20px;
+}
+.f-on { color: var(--good); }
+.f-off { color: #4a5578; }
+.f-label { color: var(--muted); }
+.f-fps { margin-left: auto; color: var(--accent); }
+
+/* ---------- control column ---------- */
+.letter-display {
+  text-align: center;
+  padding: 6px 0 12px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 12px;
+}
+.current-letter {
+  font-size: clamp(72px, 12vw, 110px);
+  line-height: 1.1;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--accent);
+  text-shadow: 0 0 40px rgba(34, 211, 238, 0.35);
+  transition: color 0.15s;
+  min-height: 1.1em;
+}
+.current-letter.space { color: var(--warn); }
+.current-letter.unknown { color: var(--muted); text-shadow: none; }
+.current-letter.learned { color: var(--accent-2); text-shadow: 0 0 40px rgba(244, 114, 182, 0.4); }
+.current-letter.flash {
+  animation: flashPop 0.45s ease;
+}
+@keyframes flashPop {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.22); color: var(--good); text-shadow: 0 0 60px rgba(52, 211, 153, 0.6); }
+  100% { transform: scale(1); }
+}
+.current-letter-name { color: var(--muted); font-size: 14px; min-height: 1.3em; }
+
+/* modes */
+.modes {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.mode-btn {
+  flex: 1;
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  border-radius: 10px;
+  padding: 8px 0;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.15s;
+}
+.mode-btn:hover { color: var(--text); }
+.mode-btn.active {
+  color: #06232b;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* drill */
+.drill { margin-bottom: 12px; }
+.drill-target {
+  font-size: 15px;
+  margin-bottom: 6px;
+  min-height: 1.4em;
+}
+.target-letter {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--warn);
+  display: inline-block;
+  margin: 0 4px;
+  vertical-align: middle;
+}
+.drill-progress {
+  height: 8px;
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.drill-bar {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--accent), var(--good));
+  transition: width 0.2s;
+}
+
+.phrase-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.phrase-row input {
+  flex: 1;
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  text-transform: uppercase;
+}
+.phrase-row input:focus { outline: none; border-color: var(--accent); }
+
+/* keyboard */
+.keyboard { margin-bottom: 12px; }
+.kb-row { display: flex; gap: 6px; margin-bottom: 6px; }
+.key {
+  flex: 1;
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 9px;
+  padding: 10px 0;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.12s;
+  user-select: none;
+}
+.key:hover { border-color: var(--accent); transform: translateY(-1px); }
+.key.key-space { flex: 3.2; font-size: 13px; color: var(--muted); font-weight: 600; }
+.key.active {
+  background: var(--accent);
+  color: #06232b;
+  border-color: var(--accent);
+  box-shadow: 0 0 16px rgba(34, 211, 238, 0.5);
+}
+.key.target {
+  border-color: var(--warn);
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.4);
+  animation: pulse 1.6s infinite;
+}
+.key.done { color: var(--muted); opacity: 0.55; }
+
+/* typed output */
+.typed-label {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+}
+.typed-sub { color: var(--accent); }
+.typed-box {
+  min-height: 72px;
+  max-height: 140px;
+  overflow-y: auto;
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 20px;
+  letter-spacing: 2px;
+  line-height: 1.6;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+.typed-box .done { color: var(--good); }
+.typed-box .target { color: var(--warn); font-weight: 700; }
+.typed-box .muted { color: #55618a; }
+.typed-box .ph.done { color: var(--good); }
+.typed-box .ph.current {
+  background: rgba(34, 211, 238, 0.18);
+  border-radius: 4px;
+  color: var(--accent);
+}
+.typed-box .ph.wrong { color: var(--bad); background: rgba(248, 113, 113, 0.15); border-radius: 4px; }
+.typed-actions { display: flex; gap: 8px; margin-top: 8px; }
+.small-btn {
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 9px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.12s;
+}
+.small-btn:hover { border-color: var(--accent); }
+
+/* ---------- guide ---------- */
+.guide-card { max-width: 1200px; margin: 0 auto 30px; padding: 16px 22px; }
+.guide-card h2 { margin: 4px 0 4px; font-size: 18px; }
+.guide-note { color: var(--muted); font-size: 13.5px; line-height: 1.6; margin: 6px 0 16px; }
+.guide-note b { color: var(--text); }
+.guide-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 10px;
+}
+.guide-cell {
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 8px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.g-emoji { font-size: 22px; min-height: 26px; }
+.g-letter { font-size: 26px; font-weight: 800; line-height: 1.1; }
+.g-desc { font-size: 11px; color: var(--muted); line-height: 1.35; }
+.g-badge {
+  margin-top: 4px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.rel-solid .g-badge { color: var(--good); background: rgba(52, 211, 153, 0.1); }
+.rel-approx .g-badge { color: var(--warn); background: rgba(251, 191, 36, 0.1); }
+.rel-motion .g-badge { color: var(--accent); background: rgba(34, 211, 238, 0.1); }
+.rel-no { opacity: 0.45; }
+.rel-no .g-badge { color: var(--muted); background: rgba(139, 149, 181, 0.1); }/* ---------- Train the shared hand model (seed tool) ---------- */
+.seed-train {
+  background: var(--card-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+}
+.seed-train summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
+  user-select: none;
+  outline: none;
+}
+.seed-train summary:hover { color: var(--accent); }
+.seed-summary { font-weight: 500; font-size: 12px; }
+.seed-body { margin-top: 10px; }
+.seed-target {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.seed-big {
+  font-size: 48px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--warn);
+  text-shadow: 0 0 26px rgba(251, 191, 36, 0.3);
+  min-width: 54px;
+  text-align: center;
+}
+.seed-meta { flex: 1; min-width: 0; }
+.seed-name { font-size: 13px; line-height: 1.35; margin-bottom: 7px; }
+.seed-name b { color: var(--warn); }
+.seed-dots { display: flex; gap: 7px; align-items: center; }
+.seed-dots .tc-extra { font-size: 11px; color: var(--muted); margin-left: 2px; }
+.seed-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid var(--line);
+  transition: all 0.2s;
+}
+.seed-dot.fill {
+  background: var(--good);
+  border-color: var(--good);
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.55);
+}
+.seed-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.train-spacer { flex: 1; }
+.seed-hint {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.55;
+  margin-top: 10px;
+}
+.seed-hint code { color: var(--accent); }
+.small-btn.danger {
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.07);
+}
+.small-btn.danger:hover { border-color: var(--bad); background: rgba(248, 113, 113, 0.16); }
+.small-btn.armed {
+  background: var(--bad);
+  border-color: var(--bad);
+  color: #fff;
+}
+
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-icon">🖐️</span>
+    <span class="brand-name">SignType</span>
+    <span class="tagline">ASL letter practice</span>
+  </div>
+  <div class="topbar-right">
+    <button id="sound-toggle" class="icon-btn" title="Toggle tick sound">🔊</button>
+    <span id="status" class="status">Loading…</span>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- Camera -->
+  <section class="card camera-card">
+    <div class="video-wrap">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="canvas"></canvas>
+      <div id="camera-error" class="camera-error hidden">
+        <p class="camera-error-title">📷 Camera unavailable</p>
+        <p class="camera-error-hint">Allow camera access, or open this page in Chrome / Edge / Firefox (webcam needs a secure context). You can still practice by clicking the keyboard.</p>
+      </div>
+      <div id="hand-hint" class="hand-hint">✋ Show a hand in the frame</div>
+    </div>
+    <div class="feature-strip" id="features"></div>
+  </section>
+
+  <!-- Control / output -->
+  <section class="card control-card">
+    <div class="letter-display">
+      <div id="current-letter" class="current-letter">—</div>
+      <div id="current-letter-name" class="current-letter-name">Hold a sign steady to type it</div>
+    </div>
+
+    <div class="modes">
+      <button class="mode-btn active" data-mode="free">Free type</button>
+      <button class="mode-btn" data-mode="alphabet">Alphabet</button>
+      <button class="mode-btn" data-mode="phrase">Phrase</button>
+    </div>
+
+    <div id="drill" class="drill hidden">
+      <div class="drill-target" id="drill-target"></div>
+      <div class="drill-progress"><div class="drill-bar" id="drill-bar"></div></div>
+    </div>
+
+    <div id="phrase-row" class="phrase-row hidden">
+      <input id="phrase-input" type="text" value="WELCOME TO MY WORLD" spellcheck="false" maxlength="80">
+      <button id="phrase-start" class="small-btn">Start</button>
+    </div>
+
+    <!-- Train the seed model (owner tool): feed the shared learning DB,
+         then Export and ship the JSON so every visitor starts pre-trained -->
+    <details id="seed-train" class="seed-train">
+      <summary>✋ Train the shared hand model <span class="seed-summary muted" id="seed-summary"></span></summary>
+      <div class="seed-body">
+        <div class="seed-target">
+          <button id="seed-prev" class="small-btn" title="Previous letter">◀</button>
+          <div class="seed-big" id="seed-big">A</div>
+          <div class="seed-meta">
+            <div class="seed-name" id="seed-name"></div>
+            <div class="seed-dots" id="seed-dots"></div>
+          </div>
+          <button id="seed-next" class="small-btn" title="Next letter">▶</button>
+        </div>
+        <div class="seed-actions">
+          <button id="seed-export" class="small-btn" title="Download every learned sample as a JSON file to ship with the app">⬇ Export learned DB</button>
+          <button id="seed-import" class="small-btn" title="Load a learned DB JSON file (from you or anyone else)">⬆ Import learned DB</button>
+          <input type="file" id="seed-import-file" accept=".json,application/json" hidden>
+          <span class="train-spacer"></span>
+          <button id="seed-clear" class="small-btn danger" title="Erase all learned samples in this browser">🗑 Clear</button>
+        </div>
+        <p class="seed-hint">Sign the letter shown and hold it steady — each hold adds a sample.
+          Do one pass through the alphabet, then <b>⬇ Export learned DB</b> and ship the JSON as
+          <code>seed-db.json</code> so everyone who opens the app starts with your hand model.
+          Visitors never need this panel — the app collects their confident signs automatically and
+          recognition gets better for them too. Everything stays in the browser; nothing is uploaded.</p>
+      </div>
+    </details>
+
+    <div class="keyboard" id="keyboard"></div>
+
+    <div class="typed-section">
+      <div class="typed-label">Typed output <span class="typed-sub" id="typed-sub"></span></div>
+      <div id="typed-box" class="typed-box"></div>
+      <div class="typed-actions">
+        <button id="copy-btn" class="small-btn">Copy</button>
+        <button id="clear-btn" class="small-btn">Clear</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<section class="card guide-card">
+  <h2>Letter guide</h2>
+  <p class="guide-note">
+    Hold each sign steady for about half a second to type it — the highlighted key shows what the camera sees right now.
+    An open palm (<b>5</b>) types a space, and <b>J</b>/<b>Z</b> are traced in the air with your index finger.
+    Letters are read by a <b>neural engine</b> (trained on the public ASL Alphabet dataset, so no setup needed),
+    which covers all 24 static letters including <b>N</b>, <b>P</b> and <b>Q</b>.
+    The app also <b>learns from every signer</b>: confident holds are stored in a small in-browser
+    database, grouped per letter, and that learned model helps recognize each person's hand better
+    the more they use it. The shipped copy can come pre-trained (see ✋ Train the shared hand model).
+  </p>
+  <div class="guide-grid" id="guide-grid"></div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script>
+/* Copyright © 2026 [Your Full Name]. All rights reserved.
+
+   ASL letter recognition from MediaPipe hand landmarks.
+   Pure functions — no DOM access, safe to unit-test.
+   Landmarks: 21 points, each {x, y, z} with x,y normalized to [0,1]. */
+"use strict";
+
+const ASL = (function () {
+
+  const L = {
+    WRIST: 0,
+    THUMB_CMC: 1, THUMB_MCP: 2, THUMB_IP: 3, THUMB_TIP: 4,
+    INDEX_MCP: 5, INDEX_PIP: 6, INDEX_DIP: 7, INDEX_TIP: 8,
+    MIDDLE_MCP: 9, MIDDLE_PIP: 10, MIDDLE_DIP: 11, MIDDLE_TIP: 12,
+    RING_MCP: 13, RING_PIP: 14, RING_DIP: 15, RING_TIP: 16,
+    PINKY_MCP: 17, PINKY_PIP: 18, PINKY_DIP: 19, PINKY_TIP: 20,
+  };
+
+  const FINGERS = {
+    index:  { mcp: L.INDEX_MCP,  pip: L.INDEX_PIP,  dip: L.INDEX_DIP,  tip: L.INDEX_TIP },
+    middle: { mcp: L.MIDDLE_MCP, pip: L.MIDDLE_PIP, dip: L.MIDDLE_DIP, tip: L.MIDDLE_TIP },
+    ring:   { mcp: L.RING_MCP,   pip: L.RING_PIP,   dip: L.RING_DIP,   tip: L.RING_TIP },
+    pinky:  { mcp: L.PINKY_MCP,  pip: L.PINKY_PIP,  dip: L.PINKY_DIP,  tip: L.PINKY_TIP },
+  };
+
+  // ---- vector helpers ----
+  function sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
+  function dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+  function norm(a) { return Math.hypot(a[0], a[1], a[2]); }
+  function dist(a, b) { return Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]); }
+  function unit(a, b) { const d = sub(a, b); const n = norm(d) || 1; return [d[0] / n, d[1] / n, d[2] / n]; }
+  function angleDeg(a, b, c) {
+    const v1 = sub(a, b), v2 = sub(c, b);
+    const n1 = norm(v1), n2 = norm(v2);
+    if (n1 < 1e-6 || n2 < 1e-6) return 180;
+    let cos = dot(v1, v2) / (n1 * n2);
+    cos = Math.max(-1, Math.min(1, cos));
+    return Math.acos(cos) * 180 / Math.PI;
+  }
+
+  // A finger counts as extended only if BOTH knuckles are nearly straight.
+  const EXT_PIP = 150, EXT_DIP = 145;
+  const CURL_PIP = 115, CURL_DIP = 115;
+
+  /* Rotate the landmark cloud so the wrist->middle-MCP axis points up on
+     screen. Features that compare "above/below" or "left/right" (thumb
+     above the knuckle row, outside the finger span) are then relative to
+     the hand itself, so tilted hands, upside-down angles, and either hand
+     behave consistently. Pure rotation: distances, angles and depth are
+     unchanged, so every other feature keeps its exact semantics. */
+  function normalizePose(raw) {
+    const lm = raw.map((p) => (Array.isArray(p) ? p : [p.x, p.y, p.z]));
+    const wrist = lm[L.WRIST], mid = lm[L.MIDDLE_MCP];
+    const dx = mid[0] - wrist[0], dy = mid[1] - wrist[1];
+    const s = Math.hypot(dx, dy);
+    if (!(s > 1e-6)) return lm;
+    const phi = -Math.atan2(dy, dx) - Math.PI / 2;
+    const cos = Math.cos(phi), sin = Math.sin(phi);
+    return lm.map((p) => [p[0] * cos - p[1] * sin, p[0] * sin + p[1] * cos, p[2]]);
+  }
+
+  /* Compute classification features from a flat landmark array
+     (each entry [x, y, z] or {x, y, z}). */
+  function analyze(raw) {
+    const lm = normalizePose(raw);
+    const wrist = lm[L.WRIST];
+    const handSize = dist(lm[L.MIDDLE_MCP], wrist) || 1e-6; // scale reference
+
+    const pip = {}, dip = {}, ext = {}, curl = {};
+    for (const name of Object.keys(FINGERS)) {
+      const f = FINGERS[name];
+      pip[name] = angleDeg(lm[f.mcp], lm[f.pip], lm[f.tip]);
+      dip[name] = angleDeg(lm[f.pip], lm[f.dip], lm[f.tip]);
+      ext[name] = pip[name] > EXT_PIP && dip[name] > EXT_DIP;
+      curl[name] = pip[name] < CURL_PIP && dip[name] < CURL_DIP;
+    }
+
+    // Thumb: "out" = the tip sticks out from the palm — either clearly above
+    // the finger-MCP row (Y/L/G/K/H/C) or outside the finger span (A sideways).
+    // A folded/crossed thumb (B/D/E/I/O/S/U/V/W) hangs over the palm instead.
+    const thumbTip = lm[L.THUMB_TIP];
+    const aboveRow = thumbTip[1] < lm[L.INDEX_MCP][1] - 0.015;
+    const outsideSpan =
+      thumbTip[0] < lm[L.INDEX_MCP][0] - 0.05 ||
+      thumbTip[0] > lm[L.PINKY_MCP][0] + 0.05;
+    const thumbOut = aboveRow || outsideSpan;
+    const indexTip = lm[L.INDEX_TIP];
+    const middleTip = lm[L.MIDDLE_TIP];
+    const ringTip = lm[L.RING_TIP];
+
+    const thumbTipIndexTip = dist(thumbTip, indexTip) / handSize;
+    const thumbTipMiddleTip = dist(thumbTip, middleTip) / handSize;
+    const thumbTipRingTip = dist(thumbTip, ringTip) / handSize;
+
+    // Where is the thumb tip among the curled fingers? (A / T / M family)
+    const dTi = dist(thumbTip, lm[L.INDEX_MCP]) / handSize;
+    const dTm = dist(thumbTip, lm[L.MIDDLE_MCP]) / handSize;
+    const dTr = dist(thumbTip, lm[L.RING_MCP]) / handSize;
+    let thumbPos = "a"; // alongside the index
+    if (dTi < 0.5 && dTm < 0.45) thumbPos = "t";          // between index + middle
+    else if (dTm < 0.45 && dTr < 0.45) thumbPos = "m";    // under middle + ring
+
+    // X: index hooked toward the camera while the rest stay tucked
+    // (the hook shows up in depth — z grows negative toward the camera)
+    const indexForwardZ = lm[L.INDEX_TIP][2] < lm[L.MIDDLE_TIP][2] - 0.06;
+    const indexProtrudes = indexForwardZ ||
+      dist(lm[L.INDEX_TIP], wrist) > dist(lm[L.MIDDLE_TIP], wrist) + 0.3 * handSize;
+
+    // S vs E: S wraps the thumb OVER the fingers (near the ring side),
+    // E keeps the thumb on the index side.
+    const thumbCloserToRing = thumbTipRingTip < thumbTipIndexTip;
+
+    // R: index + middle crossed (MCP order flips vs tip order)
+    const mcpOrder = lm[L.INDEX_MCP][0] < lm[L.MIDDLE_MCP][0];
+    const tipOrder = indexTip[0] < middleTip[0];
+    const crossed = mcpOrder !== tipOrder && dist(indexTip, middleTip) / handSize < 0.4;
+
+    // V vs U: spread fingers
+    const spread = dist(indexTip, middleTip) / handSize > 0.4;
+
+    // K vs H: K's thumb sits right at the base between index + middle
+    const midMcp = [
+      (lm[L.INDEX_MCP][0] + lm[L.MIDDLE_MCP][0]) / 2,
+      (lm[L.INDEX_MCP][1] + lm[L.MIDDLE_MCP][1]) / 2,
+      (lm[L.INDEX_MCP][2] + lm[L.MIDDLE_MCP][2]) / 2,
+    ];
+    const kThumb = dist(thumbTip, midMcp) / handSize < 0.5;
+
+    // G vs L: angle between the index and thumb directions
+    const indexDir = unit(lm[L.INDEX_TIP], lm[L.INDEX_MCP]);
+    const thumbDir = unit(lm[L.THUMB_TIP], lm[L.THUMB_MCP]);
+    const thumbIndexAngle =
+      Math.acos(Math.max(-1, Math.min(1, dot(indexDir, thumbDir)))) * 180 / Math.PI;
+
+    const pattern = [ext.index, ext.middle, ext.ring, ext.pinky].map(Number).join("");
+    const minPip = Math.min(pip.index, pip.middle, pip.ring, pip.pinky);
+    const maxPip = Math.max(pip.index, pip.middle, pip.ring, pip.pinky);
+
+    return {
+      pip, dip, ext, curl,
+      thumbOut, thumbPos, indexProtrudes, thumbCloserToRing,
+      thumbTipIndexTip, thumbTipMiddleTip, thumbTipRingTip,
+      crossed, spread, kThumb, thumbIndexAngle,
+      pattern, minPip, maxPip, handSize,
+    };
+  }
+
+  /* Map features to a letter. Returns null when nothing confident matches.
+     " " (space) is intentionally NOT returned here — the app maps the
+     open-hand pose to space itself. */
+  function classify(f) {
+    const p = f.pattern;
+    // A real fist: no extended fingers AND the knuckles are tightly bent
+    // (a half-open curved hand is C, not a fist).
+    const fist = p === "0000" && f.minPip < 115;
+    const touchingIndex = f.thumbTipIndexTip < 0.32;
+
+    // Open hand with all fingers straight: B when the thumb is tucked,
+    // otherwise the open palm ("5" / space) handled by the app.
+    if (p === "1111") return f.thumbOut ? null : "B";
+
+    // Thumb tip touching the index tip: F (fingers up) or O (tight fist)
+    if (touchingIndex) {
+      if (!f.ext.index && f.ext.middle && f.ext.ring && f.ext.pinky) return "F";
+      if (fist) return "O";
+    }
+
+    // Tight fist
+    if (fist) {
+      if (f.thumbOut) {
+        if (f.thumbPos === "t") return "T";
+        if (f.thumbPos === "m") return "M";
+        return "A";
+      }
+      if (f.indexProtrudes) return "X";
+      if (f.thumbCloserToRing) return "S";
+      return "E";
+    }
+
+    // C: half-open curved hand, thumb out, no finger fully extended
+    if (!f.ext.index && !f.ext.middle && !f.ext.ring && !f.ext.pinky &&
+        f.thumbOut && f.minPip > 100 && f.maxPip < 160 && !touchingIndex) {
+      return "C";
+    }
+
+    // Only index extended
+    if (p === "1000") {
+      if (f.thumbOut) return f.thumbIndexAngle < 50 ? "G" : "L";
+      return "D";
+    }
+
+    // Index + middle extended
+    if (p === "1100") {
+      if (f.thumbOut) return f.kThumb ? "K" : "H";
+      if (f.crossed) return "R";
+      if (f.spread) return "V";
+      return "U";
+    }
+
+    // Index + middle + ring
+    if (p === "1110") return "W";
+
+    // Pinky only
+    if (p === "0001") return f.thumbOut ? "Y" : "I";
+
+    return null;
+  }
+
+  /* Motion letters (J, Z): classify a recent path of index-tip positions
+     [{x, y, t}] in normalized image coordinates. y grows downward.
+     Returns "J", "Z" or null. Mirror-safe: horizontal directions are
+     compared relatively, so both hands work. */
+  function classifyMotion(pts) {
+    if (!pts || pts.length < 14) return null;
+    const start = pts[0], end = pts[pts.length - 1];
+    const totalX = end.x - start.x, totalY = end.y - start.y;
+    const totalMag = Math.hypot(totalX, totalY);
+    if (totalMag < 0.15) return null;
+
+    const n = pts.length;
+    const s1 = pts[Math.floor(n / 3)], s2 = pts[Math.floor(2 * n / 3)];
+    const d1 = [s1.x - start.x, s1.y - start.y];
+    const d2 = [s2.x - s1.x, s2.y - s1.y];
+    const d3 = [end.x - s2.x, end.y - s2.y];
+    const m1 = Math.hypot(d1[0], d1[1]);
+    const m2 = Math.hypot(d2[0], d2[1]);
+    const m3 = Math.hypot(d3[0], d3[1]);
+    if (m1 < 0.05 || m2 < 0.05 || m3 < 0.05) return null;
+
+    // Z: horizontal stroke → downward diagonal back toward the start → horizontal stroke
+    const z =
+      d1[0] * d3[0] > 0 &&                              // first + last go the same way
+      Math.abs(d1[0]) > 0.4 * m1 && Math.abs(d1[1]) < 0.7 * Math.abs(d1[0]) &&
+      Math.abs(d3[0]) > 0.4 * m3 && Math.abs(d3[1]) < 0.7 * Math.abs(d3[0]) &&
+      d2[1] > 0.2 * m2 && d2[0] * d1[0] < 0 &&          // middle drops diagonally back
+      Math.abs(totalY) < 0.6 * totalMag;
+
+    // J: downward stroke → any curve → upward hook
+    const j =
+      d1[1] > 0.3 * m1 && Math.abs(d1[0]) < 0.9 * m1 &&
+      d3[1] < -0.25 * m3 && Math.abs(d3[0]) < 0.9 * m3 &&
+      totalY > 0;
+
+    if (z) return "Z";
+    if (j) return "J";
+    return null;
+  }
+
+  const LETTERS = {
+    A: { desc: "Fist, thumb out to the side", emoji: "✊", rel: "solid" },
+    B: { desc: "Four fingers up, thumb tucked", emoji: "✋", rel: "solid" },
+    C: { desc: "Half-open curved hand", emoji: "", rel: "approx" },
+    D: { desc: "Index up, others curled", emoji: "👆", rel: "solid" },
+    E: { desc: "Fingers curled, thumb in front", emoji: "", rel: "approx" },
+    F: { desc: "Thumb touches index tip, three fingers up", emoji: "🤏", rel: "approx" },
+    G: { desc: "Index + thumb forward, others curled", emoji: "", rel: "approx" },
+    H: { desc: "Index + middle up, thumb resting on them", emoji: "", rel: "approx" },
+    I: { desc: "Pinky up, others curled", emoji: "", rel: "solid" },
+    J: { desc: "Trace a J in the air with your index", emoji: "", rel: "motion" },
+    K: { desc: "Index + middle up, thumb between them", emoji: "", rel: "approx" },
+    L: { desc: "Index + thumb up in an L", emoji: "", rel: "solid" },
+    M: { desc: "Fist, thumb tucked under middle + ring", emoji: "", rel: "approx" },
+    N: { desc: "Fist, thumb under index + middle", emoji: "", rel: "solid" },
+    O: { desc: "All fingertips touch the thumb tip", emoji: "👌", rel: "approx" },
+    P: { desc: "Index + thumb point down", emoji: "", rel: "solid" },
+    Q: { desc: "Like P with the thumb hanging lower", emoji: "", rel: "solid" },
+    R: { desc: "Index + middle crossed", emoji: "🤞", rel: "approx" },
+    S: { desc: "Fist, thumb over the fingers", emoji: "", rel: "approx" },
+    T: { desc: "Fist, thumb between index + middle", emoji: "", rel: "approx" },
+    U: { desc: "Index + middle up, side by side", emoji: "", rel: "approx" },
+    V: { desc: "Index + middle up, spread apart", emoji: "✌️", rel: "solid" },
+    W: { desc: "Index + middle + ring up", emoji: "", rel: "solid" },
+    X: { desc: "Index hooked, others curled", emoji: "", rel: "approx" },
+    Y: { desc: "Thumb + pinky out", emoji: "🤙", rel: "solid" },
+    Z: { desc: "Trace a Z in the air with your index", emoji: "", rel: "motion" },
+  };
+
+  return { L, FINGERS, analyze, classify, classifyMotion, normalizePose, LETTERS };
+})();
+</script>
+<script>
+/* Copyright © 2026 [Your Full Name]. All rights reserved.
+
+   Train-your-own sign classifier: k-NN over canonicalized MediaPipe hand
+   landmarks. Pure logic — no DOM access, safe to unit-test.
+
+   Each recorded sample is a MediaPipe-style flat landmark list (21 points)
+   turned into one canonical vector of 63 numbers by canonicalize():
+     - wrist translated to the origin,
+     - scaled so wrist -> middle-MCP has length 1,
+     - rotated so that axis points up on screen,
+     - x-mirrored so the index-finger side is always to the right.
+   That makes samples comparable no matter where the hand is in the frame,
+   how big it is, or which hand signs. Classification is weighted k-NN:
+   the vote weight of a neighbor is 1 / distance^2, and confidence is the
+   winning letter's share of the total weight. */
+"use strict";
+
+const KNN = (function () {
+  const NUM_LANDMARKS = 21;
+  const DIM = NUM_LANDMARKS * 3; // 63
+
+  /* Flat landmark list (entries {x,y,z} or [x,y,z]) -> canonical 63-vector,
+     or null when the hand can't be aligned (degenerate geometry). */
+  function canonicalize(raw) {
+    if (!raw || raw.length < NUM_LANDMARKS) return null;
+    const lm = [];
+    for (let i = 0; i < NUM_LANDMARKS; i++) {
+      const p = raw[i];
+      lm.push(Array.isArray(p) ? [p[0], p[1], p[2]] : [p.x, p.y, p.z]);
+    }
+    const wrist = lm[0];
+    const midMcp = lm[9];
+    const dx = midMcp[0] - wrist[0];
+    const dy = midMcp[1] - wrist[1];
+    const s = Math.hypot(dx, dy);
+    if (!(s > 1e-6)) return null;
+
+    // Rotate so wrist -> middle-MCP points up (negative y in image coords).
+    const phi = -Math.atan2(dy, dx) - Math.PI / 2;
+    const cos = Math.cos(phi), sin = Math.sin(phi);
+
+    const v = new Array(DIM);
+    for (let i = 0; i < NUM_LANDMARKS; i++) {
+      const px = lm[i][0] - wrist[0];
+      const py = lm[i][1] - wrist[1];
+      const pz = lm[i][2] - wrist[2];
+      v[i * 3] = (px * cos - py * sin) / s;
+      v[i * 3 + 1] = (px * sin + py * cos) / s;
+      v[i * 3 + 2] = pz / s;
+    }
+    // Mirror to a canonical handedness: index MCP on the positive-x side.
+    if (v[5 * 3] < 0) {
+      for (let i = 0; i < NUM_LANDMARKS; i++) v[i * 3] = -v[i * 3];
+    }
+    return v;
+  }
+
+  function dist(a, b) {
+    let d2 = 0;
+    for (let i = 0; i < DIM; i++) {
+      const t = a[i] - b[i];
+      d2 += t * t;
+    }
+    return Math.sqrt(d2);
+  }
+
+  class Model {
+    constructor(opts = {}) {
+      this.k = opts.k || 7;                 // neighbors to vote
+      this.minSamples = opts.minSamples || 2; // a letter must have >= this many
+      this.samples = [];                    // [{letter, v}]
+    }
+
+    add(letter, v) {
+      if (!letter || !v || v.length !== DIM) return;
+      this.samples.push({ letter, v });
+    }
+
+    removeLast() {
+      return this.samples.pop() || null;
+    }
+
+    clear() { this.samples.length = 0; }
+
+    get total() { return this.samples.length; }
+
+    counts() {
+      const c = {};
+      for (const s of this.samples) c[s.letter] = (c[s.letter] || 0) + 1;
+      return c;
+    }
+
+    /* Letters that have collected at least minSamples samples. */
+    activeLetters() {
+      const c = this.counts();
+      return Object.keys(c).filter((l) => c[l] >= this.minSamples).sort();
+    }
+
+    /* Weighted k-NN vote. Letters below minSamples never compete.
+       Returns { letter, conf, nn, active }:
+         letter  winning letter or null,
+         conf    winning share of total vote weight in [0, 1],
+         nn      distance to the single nearest neighbor (Infinity if none),
+         active  number of letters that were allowed to compete. */
+    classify(v) {
+      const counts = this.counts();
+      const active = new Set(Object.keys(counts).filter(
+        (l) => counts[l] >= this.minSamples));
+      const cand = [];
+      for (const s of this.samples) if (active.has(s.letter)) cand.push(s);
+      if (!cand.length || !v || v.length !== DIM) {
+        return { letter: null, conf: 0, nn: Infinity, active: active.size };
+      }
+
+      const ranked = cand
+        .map((s) => ({ s, d: dist(v, s.v) }))
+        .sort((a, b) => a.d - b.d);
+      const k = Math.min(this.k, ranked.length);
+
+      const votes = {};
+      let weightSum = 0;
+      for (let i = 0; i < k; i++) {
+        const d = ranked[i].d;
+        const w = 1 / (d * d + 1e-6);
+        votes[ranked[i].s.letter] = (votes[ranked[i].s.letter] || 0) + w;
+        weightSum += w;
+      }
+      let best = null, bestW = -1;
+      for (const l of Object.keys(votes)) {
+        if (votes[l] > bestW) { bestW = votes[l]; best = l; }
+      }
+      return {
+        letter: best,
+        conf: weightSum > 0 ? votes[best] / weightSum : 0,
+        nn: ranked[0].d,
+        active: active.size,
+      };
+    }
+
+    toJSON() {
+      return {
+        k: this.k,
+        minSamples: this.minSamples,
+        samples: this.samples.map((s) => [s.letter, s.v]),
+      };
+    }
+
+    static fromJSON(json) {
+      const m = new Model({ k: json && json.k, minSamples: json && json.minSamples });
+      const list = (json && json.samples) || [];
+      for (const entry of list) {
+        const letter = entry && entry[0];
+        const v = entry && entry[1];
+        if (!/^[A-Z]$/.test(letter || "")) continue;
+        if (!v || v.length !== DIM) continue;
+        let ok = true;
+        for (let i = 0; i < v.length; i++) if (!Number.isFinite(v[i])) { ok = false; break; }
+        if (ok) m.add(letter, v);
+      }
+      return m;
+    }
+  }
+
+  return { canonicalize, dist, Model };
+})();
+
+</script>
+<script>
+/* Copyright © 2026 [Your Full Name]. All rights reserved.
+
+   Sliding-window majority voter for per-frame recognition results.
+   Pure logic — no DOM access, safe to unit-test.
+
+   A single misread frame used to reset the whole "hold steady" timer,
+   so flicker between look-alike letters (A/S/E, H/U, V/K...) made
+   typing feel broken. The voter smooths the per-frame letter stream:
+   a letter only becomes active once it wins a majority of the last N
+   frames, and one glitchy frame can no longer break a stable hold. */
+"use strict";
+
+const VOTE = (function () {
+
+  class SlidingVote {
+    /* size: how many recent frames to consider.
+       minShare: fraction of the window a letter must win (0..1). */
+    constructor(size = 10, minShare = 0.6) {
+      this.size = size;
+      this.minVotes = Math.ceil(minShare * size);
+      this.win = [];
+    }
+
+    /* Record one frame's letter (null = no confident match) and return
+       the current majority letter, or null when no letter holds the
+       required share. Nulls decay the window without vetoing it, so a
+       few unrecognized frames can't kill a valid hold. */
+    push(v) {
+      this.win.push(v);
+      if (this.win.length > this.size) this.win.shift();
+      return this.majority();
+    }
+
+    majority() {
+      const counts = {};
+      for (const v of this.win) {
+        if (v === null || v === undefined) continue;
+        counts[v] = (counts[v] || 0) + 1;
+      }
+      let best = null, bestN = 0;
+      for (const k of Object.keys(counts)) {
+        if (counts[k] > bestN) { bestN = counts[k]; best = k; }
+      }
+      return bestN >= this.minVotes ? best : null;
+    }
+
+    clear() { this.win.length = 0; }
+  }
+
+  return { SlidingVote };
+})();
+</script>
+<script>
+/* Copyright © 2026 [Your Full Name]. All rights reserved.
+
+   Neural engine: a small dense network that maps 21 MediaPipe hand
+   landmarks (x, y, z each, 63 inputs, flattened as-is) to an ASL static
+   letter (A-Y, no J/Z — those are traced). Pure JS, no dependencies.
+
+   The weights in asl-net.json come from the ASL Alphabet Classifier by
+   AmimulBmeIU (MIT license, validation accuracy 94.15%):
+     https://huggingface.co/AmimulBmeIU/asl-alphabet-classifier
+   They were exported from its TensorFlow.js build by tools/export-net.mjs,
+   which byte-slices the weight shard; tools/parity-tfjs.mjs confirms the
+   sliced weights reproduce the original model's outputs (max diff < 1e-6).
+
+   Architecture: Dense 128 relu -> Dropout(0.3, inference no-op) ->
+   Dense 64 relu -> Dropout(0.2, no-op) -> Dense 24 softmax.
+   Keras channel-last conventions: Dense kernel [in, out]. */
+"use strict";
+
+const NET = (function () {
+
+  function dense(vec, layer) {
+    const { w, b } = layer;
+    const outN = layer.units || layer.out;
+    const out = new Float32Array(outN);
+    for (let o = 0; o < outN; o++) {
+      let acc = b[o];
+      for (let i = 0; i < vec.length; i++) acc += vec[i] * w[i * outN + o];
+      out[o] = acc;
+    }
+    return out;
+  }
+
+  function reluInPlace(a) {
+    for (let i = 0; i < a.length; i++) if (a[i] < 0) a[i] = 0;
+    return a;
+  }
+
+  function softmax(logits) {
+    let mx = -Infinity;
+    for (const v of logits) if (v > mx) mx = v;
+    let sum = 0;
+    const p = new Float32Array(logits.length);
+    for (let i = 0; i < logits.length; i++) {
+      p[i] = Math.exp(logits[i] - mx);
+      sum += p[i];
+    }
+    for (let i = 0; i < p.length; i++) p[i] /= sum;
+    return p;
+  }
+
+  /* Predict from a flat 63-value landmark vector ([x,y,z]*21, mediapipe
+     normalized coordinates, z wrist-relative). Returns
+     { letter, index, conf, probs } or null for a bad input length. */
+  function predict(model, x63) {
+    if (!model || !x63 || x63.length !== 63) return null;
+    let h = new Float32Array(63);
+    h.set(x63);
+    for (const layer of model.layers) {
+      if (layer.type !== "dense") continue; // dropout is a training no-op
+      h = dense(h, layer);
+      if (layer.activation === "relu") reluInPlace(h);
+      else if (layer.activation === "softmax") {
+        const probs = softmax(h);
+        let best = 0;
+        for (let i = 1; i < probs.length; i++) if (probs[i] > probs[best]) best = i;
+        return {
+          letter: model.letters[best],
+          index: best,
+          conf: probs[best],
+          probs,
+        };
+      }
+    }
+    return null;
+  }
+
+  function load(json) {
+    if (!json || !json.layers || !json.letters) {
+      throw new Error("net: model JSON missing layers or letters");
+    }
+    return json;
+  }
+
+  return { load, predict, softmax };
+})();
+
+</script>
+<script>
+/* Copyright © 2026 [Your Full Name]. All rights reserved.
+
+   Learning library: a small browser database of sign samples that the app
+   collects automatically (no training UI). Pure logic — no DOM access,
+   safe to unit-test.
+
+   How it learns:
+     - Every time the neural engine confidently reads a held letter, the
+       canonical landmark vector (see knn.js) for that hold is stored.
+     - Samples are grouped per letter (the "sorting") and capped at
+       MAX_PER_LETTER, keeping the freshest ones — so the library reflects
+       how *this* user signs today.
+     - Near-duplicate holds are rejected (minDupDist) so one pose can't
+       flood the library.
+     - library.toModel() turns the collection into a KNN.Model, so the
+       database *is* the classifier: recognition gets better as samples
+       accumulate, with no retraining step.
+
+   Persistence: IndexedDB (a real browser database) via saveToIDB /
+   loadFromIDB. Everything stays in the user's own browser — samples are
+   never uploaded anywhere. */
+"use strict";
+
+const LEARN = (function () {
+  const DIM = 63; // canonical landmark vector length (21 points x 3)
+  const MAX_PER_LETTER = 48; // cap samples per letter (freshest kept)
+  const MIN_DUP_DIST = 0.35; // reject a sample this close to one we have
+  const DB_NAME = "signtype-learn";
+  const DB_VERSION = 1;
+  const STORE = "samples";
+
+  /* In-memory sample library. Samples: { letter, v (Float64Array 63), t }. */
+  class Library {
+    constructor(opts = {}) {
+      this.maxPerLetter = opts.maxPerLetter || MAX_PER_LETTER;
+      this.minDupDist = opts.minDupDist != null ? opts.minDupDist : MIN_DUP_DIST;
+      this.samples = [];
+    }
+
+    get total() { return this.samples.length; }
+
+    counts() {
+      const c = {};
+      for (const s of this.samples) c[s.letter] = (c[s.letter] || 0) + 1;
+      return c;
+    }
+
+    /* Add a sample. Returns { added, reason } — reason is "ok", "dup",
+       "bad-letter" or "bad-vec". Rejects near-duplicates of the same
+       letter and evicts the oldest sample of that letter past the cap. */
+    add(letter, v, t) {
+      if (!/^[A-Z]$/.test(letter || "")) return { added: false, reason: "bad-letter" };
+      if (!v || v.length !== DIM) return { added: false, reason: "bad-vec" };
+      for (const s of this.samples) {
+        if (s.letter === letter && KNN.dist(s.v, v) < this.minDupDist) {
+          return { added: false, reason: "dup" };
+        }
+      }
+      let n = 0, oldest = null, oldestT = Infinity;
+      for (const s of this.samples) {
+        if (s.letter === letter) {
+          n++;
+          if (s.t < oldestT) { oldestT = s.t; oldest = s; }
+        }
+      }
+      if (n >= this.maxPerLetter && oldest) {
+        this.samples.splice(this.samples.indexOf(oldest), 1);
+      }
+      this.samples.push({ letter, v: Float64Array.from(v), t: t != null ? t : Date.now() });
+      return { added: true, reason: "ok" };
+    }
+
+    clear() { this.samples.length = 0; }
+
+    /* Build the k-NN model that *is* the learned engine. Letters with at
+       least minSamples samples compete; confidence gates live in the
+       model's classify(). */
+    toModel(opts = {}) {
+      const m = new KNN.Model({
+        k: opts.k || 7,
+        minSamples: opts.minSamples != null ? opts.minSamples : 2,
+      });
+      for (const s of this.samples) m.add(s.letter, s.v);
+      return m;
+    }
+
+    toJSON() {
+      return {
+        maxPerLetter: this.maxPerLetter,
+        minDupDist: this.minDupDist,
+        samples: this.samples.map((s) => [s.letter, Array.from(s.v), s.t]),
+      };
+    }
+
+    static fromJSON(json) {
+      const lib = new Library({
+        maxPerLetter: json && json.maxPerLetter,
+        minDupDist: json && json.minDupDist,
+      });
+      for (const e of (json && json.samples) || []) {
+        if (!e || !/^[A-Z]$/.test(e[0] || "")) continue;
+        if (!e[1] || e[1].length !== DIM) continue;
+        lib.add(e[0], e[1], e[2]);
+      }
+      return lib;
+    }
+  }
+
+  // ---------------- IndexedDB glue (browser only) ----------------
+
+  function openIDB() {
+    return new Promise((resolve, reject) => {
+      if (typeof indexedDB === "undefined") {
+        reject(new Error("IndexedDB unavailable"));
+        return;
+      }
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(STORE)) {
+          db.createObjectStore(STORE, { keyPath: "id", autoIncrement: true });
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error || new Error("IndexedDB open failed"));
+    });
+  }
+
+  /* Replace the persisted library with the current one (idempotent). */
+  async function saveToIDB(lib) {
+    const db = await openIDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, "readwrite");
+      const store = tx.objectStore(STORE);
+      store.clear();
+      for (const s of lib.samples) {
+        store.add({ letter: s.letter, v: Array.from(s.v), t: s.t });
+      }
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { db.close(); reject(tx.error); };
+    });
+  }
+
+  /* Merge the persisted library into an (empty) in-memory one. */
+  async function loadFromIDB(lib) {
+    const db = await openIDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, "readonly");
+      const req = tx.objectStore(STORE).getAll();
+      req.onsuccess = () => {
+        for (const row of req.result || []) {
+          if (!row || !row.letter || !row.v) continue;
+          lib.add(row.letter, row.v, row.t);
+        }
+        db.close();
+        resolve();
+      };
+      req.onerror = () => { db.close(); reject(req.error); };
+    });
+  }
+
+  /* Serialize a library to a portable JSON string (for download / shipping
+     as the app's seed database). Includes a format marker so imports can
+     be validated. */
+  function exportJSON(lib) {
+    return JSON.stringify({
+      format: "signtype-learn-db",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      ...lib.toJSON(),
+    });
+  }
+
+  /* Parse a library from an exported JSON string. Throws on anything that
+     isn't a SignType learning DB. */
+  function importJSON(str) {
+    const json = JSON.parse(str);
+    if (!json || json.format !== "signtype-learn-db") {
+      throw new Error("Not a SignType learning DB file");
+    }
+    return Library.fromJSON(json);
+  }
+
+  /* Merge every sample of source into target (dedupe + caps apply, so
+     overlaps are dropped and each library's own cap is respected).
+     Returns how many samples were newly added. */
+  function mergeInto(target, source) {
+    let added = 0;
+    for (const s of source.samples) {
+      if (target.add(s.letter, s.v, s.t).added) added++;
+    }
+    return added;
+  }
+
+  return {
+    Library, saveToIDB, loadFromIDB, exportJSON, importJSON, mergeInto,
+    DIM, MAX_PER_LETTER, MIN_DUP_DIST,
+  };
+})();
+</script>
+<script>
+/* Copyright © 2026 [Your Full Name]. All rights reserved.
+
+   SignType — app glue: webcam, hand tracking, typing logic, UI.
+   Recognition engines:
+     - neural (net.js + asl-net.json): a CNN trained on the public
+       Sign Language MNIST dataset — the default engine for static
+       letters. Covers A-Y incl. N/P/Q.
+     - rules (asl.js): a fallback when the net is unsure, plus
+       open-hand space and J/Z motion tracing.
+     - learned (db.js + knn.js): an in-browser database of sign samples
+       collected automatically from every confident hold, grouped per
+       letter and classified with k-NN. It gets better the more the app
+       is used, and a shipped seed DB means new users start pre-trained. */
+"use strict";
+
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const video = $("video"), canvas = $("canvas"), ctx = canvas.getContext("2d");
+  const statusEl = $("status"), featuresEl = $("features");
+  const currentLetterEl = $("current-letter"), currentNameEl = $("current-letter-name");
+  const handHint = $("hand-hint"), cameraError = $("camera-error");
+  const keyboardEl = $("keyboard"), guideGridEl = $("guide-grid");
+  const typedBox = $("typed-box"), typedSub = $("typed-sub");
+  const drillEl = $("drill"), drillTarget = $("drill-target"), drillBar = $("drill-bar");
+  const phraseRow = $("phrase-row"), phraseInput = $("phrase-input"), phraseStart = $("phrase-start");
+  const copyBtn = $("copy-btn"), clearBtn = $("clear-btn"), soundToggle = $("sound-toggle");
+  const seedTrain = $("seed-train"), seedSummary = $("seed-summary");
+  const seedBig = $("seed-big"), seedName = $("seed-name"), seedDots = $("seed-dots");
+  const seedPrev = $("seed-prev"), seedNext = $("seed-next");
+  const seedExport = $("seed-export"), seedImport = $("seed-import");
+  const seedImportFile = $("seed-import-file"), seedClear = $("seed-clear");
+
+  // ---------------- constants ----------------
+  const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const LEGACY_MODEL_KEY = "signtype-knn-model-v1"; // My-signs model, migrated once
+  const NET_CONF_MIN = 0.6;     // neural engine: act on a class only above this
+  const COLLECT_CONF = 0.75;    // auto-collect a sample only when the net is this sure
+  const NET_ONLY = new Set(["N", "P", "Q"]); // letters the rules can't produce
+  const CONF_MIN = 0.55;        // learned k-NN confidence gate (0..1)
+  const NN_MAX = 1.2;           // learned k-NN nearest-neighbor distance gate
+  const SEED_URL = "seed-db.json";
+  const SEED_GOAL = 5;          // seed trainer: dots shown per letter (soft target)
+  const MAX_DOTS = 8;           // cap dots rendered per letter
+
+  // ---------------- state ----------------
+  const state = {
+    mode: "free",
+    typed: "",
+    drillIdx: 0,
+    phrase: "WELCOME TO MY WORLD",
+    phrasePos: 0,
+    phraseWrong: new Set(),
+    celebration: 0,
+  };
+  // Drill walks the neural engine's static letters (A-Y minus motion J/Z),
+  // so N, P and Q are included — they were undetectable under pure rules.
+  const DRILL_SEQ = [..."ABCDEFGHIKLMNOPQRSTUVWXY"];
+
+  let stableLetter = null, stableSince = 0, holdTyped = false;
+  let lastTypedAt = 0, lastMotionType = 0;
+  const voter = new VOTE.SlidingVote(10, 0.6); // smooths per-frame recognition
+  const cooldown = {};                 // letter -> timestamp when re-typable
+  let motionPath = [];                 // [{x, y, t}] index-tip trail
+  let soundOn = true, audioCtx = null;
+  let frameCount = 0, fps = 0, fpsTimer = performance.now();
+  let noHandFrames = 0;
+  let lastGlyph = null, lastCls = null, flashAt = 0;
+
+  // ---- neural engine state (net.js + asl-net.json) ----
+  let netModel = null;
+  let netStatus = "loading";   // "loading" | "ready" | "error"
+
+  // ---- learning library state (db.js) ----
+  let library = new LEARN.Library();
+  let learnedModel = library.toModel();
+  let learnDirty = false;
+  let saveTimer = null;
+  let seedTarget = "A";
+  let seedMsgTimer = null;
+  let clearArmed = false, clearTimer = null;
+
+  const REL_BADGE = { solid: "reliable", approx: "approx", motion: "trace it", no: "not detected" };
+
+  // ---------------- build static UI ----------------
+  const KEY_ROWS = [
+    ["A", "B", "C", "D", "E", "F", "G", "H"],
+    ["I", "J", "K", "L", "M", "N", "O", "P"],
+    ["Q", "R", "S", "T", "U", "V", "W", "X"],
+    ["Y", "Z", "SPACE"],
+  ];
+  KEY_ROWS.forEach((row) => {
+    const div = document.createElement("div");
+    div.className = "kb-row";
+    row.forEach((ch) => {
+      const b = document.createElement("button");
+      b.className = "key" + (ch === "SPACE" ? " key-space" : "");
+      b.textContent = ch === "SPACE" ? "␣ space" : ch;
+      b.dataset.letter = ch;
+      b.addEventListener("click", () => typeLetter(ch === "SPACE" ? " " : ch, true));
+      div.appendChild(b);
+    });
+    keyboardEl.appendChild(div);
+  });
+
+  for (const ch of ALPHABET) {
+    const info = ASL.LETTERS[ch];
+    const cell = document.createElement("div");
+    cell.className = "guide-cell rel-" + info.rel;
+    cell.innerHTML =
+      `<div class="g-emoji">${info.emoji || "·"}</div>` +
+      `<div class="g-letter">${ch}</div>` +
+      `<div class="g-desc">${info.desc}</div>` +
+      `<div class="g-badge">${REL_BADGE[info.rel]}</div>`;
+    guideGridEl.appendChild(cell);
+  }
+
+  // ---------------- status / helpers ----------------
+  function setStatus(text, isError) {
+    statusEl.textContent = text;
+    statusEl.classList.toggle("error", !!isError);
+  }
+
+  function resetStability() {
+    stableLetter = null;
+    stableSince = 0;
+    holdTyped = false;
+  }
+
+  function tickSound(freq) {
+    if (!soundOn) return;
+    try {
+      audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      const t = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.1, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(t);
+      osc.stop(t + 0.1);
+    } catch (e) { /* audio not allowed yet */ }
+  }
+
+  // ---------------- learning library ----------------
+  /* Persist the library (debounced) to IndexedDB — the in-browser DB. */
+  function scheduleSave() {
+    if (saveTimer) return;
+    saveTimer = setTimeout(async () => {
+      saveTimer = null;
+      try { await LEARN.saveToIDB(library); }
+      catch (e) { console.warn("Could not save learning library:", e); }
+    }, 800);
+  }
+
+  /* Add one sample to the library and refresh the learned model. */
+  function collectSample(letter, vec) {
+    if (!letter || letter === " " || !vec) return;
+    const res = library.add(letter, vec, Date.now());
+    if (res.added) {
+      learnedModel = library.toModel();
+      learnDirty = true;
+      scheduleSave();
+      renderSeed();
+    }
+  }
+
+  /* Load order: legacy My-signs model (migrate once) -> this browser's
+     DB -> the shipped seed DB (single-file build inlines it, otherwise
+     fetched next to the app). Everything merges; dedupe keeps it clean. */
+  async function initLearn() {
+    try {
+      const raw = localStorage.getItem(LEGACY_MODEL_KEY);
+      if (raw) {
+        const legacy = KNN.Model.fromJSON(JSON.parse(raw));
+        let n = 0;
+        for (const s of legacy.samples) {
+          if (library.add(s.letter, s.v, Date.now()).added) n++;
+        }
+        localStorage.removeItem(LEGACY_MODEL_KEY);
+        if (n) console.log("Migrated", n, "legacy My-signs samples into the learning library");
+      }
+    } catch (e) { console.warn("Could not migrate legacy model:", e); }
+
+    try { await LEARN.loadFromIDB(library); }
+    catch (e) { console.warn("Could not load learning library:", e); }
+
+    try {
+      if (window.SEED_DB) loadSeed(window.SEED_DB, "bundled seed");
+      else {
+        const res = await fetch(SEED_URL);
+        if (res.ok) loadSeed(await res.json(), SEED_URL);
+      }
+    } catch (e) { /* no seed shipped — fine */ }
+
+    learnedModel = library.toModel();
+    learnDirty = true;
+    renderSeed();
+    scheduleSave();
+  }
+
+  function loadSeed(json, label) {
+    if (!json || !json.samples || !json.samples.length) return;
+    try {
+      const seed = LEARN.Library.fromJSON(json);
+      const added = LEARN.mergeInto(library, seed);
+      if (added) console.log("Seed DB", label, "added", added, "samples");
+    } catch (e) { console.warn("Bad seed DB (" + label + "):", e); }
+  }
+
+  // ---------------- seed trainer UI ----------------
+  function renderSeed() {
+    if (!seedSummary) return;
+    const lc = library.counts();
+    const letters = Object.keys(lc).length;
+    const got = lc[seedTarget] || 0;
+    seedSummary.textContent = `${library.total} samples · ${letters}/26 letters`;
+
+    seedBig.textContent = seedTarget;
+    seedName.innerHTML =
+      `<b>${seedTarget}</b> · ${ASL.LETTERS[seedTarget].desc} — ` +
+      (got >= SEED_GOAL
+        ? `${got} samples, good. Keep adding variety or move on.`
+        : `sign it and hold steady; each hold records (${got} so far).`);
+
+    let dots = "";
+    const n = Math.min(got, MAX_DOTS);
+    for (let i = 0; i < n; i++) dots += `<span class="seed-dot fill"></span>`;
+    if (got > MAX_DOTS) dots += `<span class="tc-extra">+${got - MAX_DOTS}</span>`;
+    seedDots.innerHTML = dots;
+  }
+
+  function flashSeed(msg, ok = true) {
+    seedSummary.textContent = msg;
+    seedSummary.style.color = ok ? "var(--good)" : "var(--bad)";
+    if (seedMsgTimer) clearTimeout(seedMsgTimer);
+    seedMsgTimer = setTimeout(() => {
+      seedSummary.style.color = "";
+      renderSeed();
+    }, 2600);
+  }
+
+  function stepSeed(dir) {
+    const idx = ALPHABET.indexOf(seedTarget);
+    seedTarget = ALPHABET[(idx + dir + 26) % 26];
+    renderSeed();
+  }
+
+  seedPrev.addEventListener("click", () => stepSeed(-1));
+  seedNext.addEventListener("click", () => stepSeed(1));
+
+  seedExport.addEventListener("click", () => {
+    const json = LEARN.exportJSON(library);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "signtype-learn-db.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    flashSeed(`Exported ${library.total} samples — ship this as seed-db.json`);
+  });
+
+  seedImport.addEventListener("click", () => seedImportFile.click());
+  seedImportFile.addEventListener("change", async () => {
+    const file = seedImportFile.files && seedImportFile.files[0];
+    seedImportFile.value = "";
+    if (!file) return;
+    try {
+      const seed = LEARN.importJSON(await file.text());
+      const added = LEARN.mergeInto(library, seed);
+      learnedModel = library.toModel();
+      learnDirty = true;
+      scheduleSave();
+      renderSeed();
+      flashSeed(`Imported ${seed.total} samples (${added} new to this browser)`);
+    } catch (e) {
+      flashSeed("Import failed — not a SignType learning DB", false);
+    }
+  });
+
+  seedClear.addEventListener("click", () => {
+    if (!clearArmed) {
+      clearArmed = true;
+      seedClear.classList.add("armed");
+      seedClear.textContent = "Really clear?";
+      clearTimer = setTimeout(disarmClear, 2600);
+      return;
+    }
+    disarmClear();
+    library.clear();
+    learnedModel = library.toModel();
+    learnDirty = true;
+    scheduleSave();
+    renderSeed();
+    flashSeed("Learning library cleared in this browser");
+  });
+  function disarmClear() {
+    clearArmed = false;
+    seedClear.classList.remove("armed");
+    seedClear.textContent = "🗑 Clear";
+    if (clearTimer) { clearTimeout(clearTimer); clearTimer = null; }
+  }
+
+  // ---------------- typing ----------------
+  function typeLetter(letter, manual) {
+    const now = performance.now();
+    lastTypedAt = now;
+    if (!manual) cooldown[letter] = now;
+
+    // feedback
+    flashAt = now;
+    currentLetterEl.classList.remove("flash");
+    void currentLetterEl.offsetWidth; // restart animation
+    currentLetterEl.classList.add("flash");
+    tickSound(letter === " " ? 240 : 660);
+
+    // apply to the active mode
+    if (state.mode === "free") {
+      state.typed += letter;
+      updateOutputUI();
+    } else if (state.mode === "alphabet") {
+      if (letter === DRILL_SEQ[state.drillIdx]) {
+        state.drillIdx++;
+        if (state.drillIdx >= DRILL_SEQ.length) {
+          state.drillIdx = 0;
+          state.celebration = performance.now();
+          tickSound(880);
+          setTimeout(() => tickSound(1175), 120);
+        }
+      }
+      updateOutputUI();
+    } else if (state.mode === "phrase") {
+      const expect = state.phrase[state.phrasePos];
+      if (letter === expect) {
+        state.phraseWrong.delete(state.phrasePos);
+        state.phrasePos++;
+        if (state.phrasePos >= state.phrase.length) {
+          state.phrasePos = 0;
+          state.phraseWrong.clear();
+          state.celebration = performance.now();
+          tickSound(880);
+          setTimeout(() => tickSound(1175), 120);
+        }
+      } else {
+        state.phraseWrong.add(state.phrasePos);
+        tickSound(140);
+      }
+      updateOutputUI();
+    }
+  }
+
+  function updateOutputUI() {
+    // keyboard drill states
+    document.querySelectorAll(".key").forEach((k) => {
+      const ch = k.dataset.letter;
+      const inDrill = state.mode === "alphabet" && DRILL_SEQ.indexOf(ch) !== -1;
+      k.classList.toggle("target", inDrill && DRILL_SEQ[state.drillIdx] === ch);
+      k.classList.toggle("done", inDrill && DRILL_SEQ.indexOf(ch) < state.drillIdx);
+    });
+
+    if (state.mode === "free") {
+      typedBox.textContent = state.typed + "▍";
+      typedSub.textContent = state.typed.length + " chars";
+    } else if (state.mode === "alphabet") {
+      typedBox.innerHTML = DRILL_SEQ.map((ch, i) =>
+        `<span class="${i < state.drillIdx ? "done" : i === state.drillIdx ? "target" : "muted"}">${ch}</span>`
+      ).join(" ");
+      drillBar.style.width = (state.drillIdx / DRILL_SEQ.length * 100) + "%";
+      const celeb = performance.now() - state.celebration < 1500;
+      drillTarget.innerHTML = celeb
+        ? "🎉 Alphabet done! Starting over…"
+        : `Sign <b class="target-letter">${DRILL_SEQ[state.drillIdx]}</b>` +
+          `<span class="muted"> · ${state.drillIdx} / ${DRILL_SEQ.length}</span>`;
+      typedSub.textContent = state.drillIdx + " / " + DRILL_SEQ.length;
+    } else { // phrase
+      typedBox.innerHTML = state.phrase.split("").map((c, i) => {
+        let cls = "ph";
+        if (i < state.phrasePos) cls += " done";
+        else if (i === state.phrasePos) cls += " current";
+        if (state.phraseWrong.has(i)) cls += " wrong";
+        return `<span class="${cls}">${c === " " ? "␣" : c}</span>`;
+      }).join("");
+      drillBar.style.width = (state.phrasePos / state.phrase.length * 100) + "%";
+      const celeb = performance.now() - state.celebration < 1500;
+      drillTarget.innerHTML = celeb
+        ? "🎉 Phrase done! Starting over…"
+        : `Type the phrase <span class="muted">· ${state.phrasePos} / ${state.phrase.length} chars</span>`;
+      typedSub.textContent = state.phrasePos + " / " + state.phrase.length;
+    }
+  }
+
+  function resetDrill() {
+    state.drillIdx = 0;
+    state.phrasePos = 0;
+    state.phraseWrong = new Set();
+    state.celebration = 0;
+    updateOutputUI();
+  }
+
+  // ---------------- mode switching ----------------
+  document.querySelectorAll(".mode-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".mode-btn").forEach((b) =>
+        b.classList.toggle("active", b === btn));
+      state.mode = btn.dataset.mode;
+      drillEl.classList.toggle("hidden", state.mode === "free");
+      phraseRow.classList.toggle("hidden", state.mode !== "phrase");
+      keyboardEl.classList.remove("hidden");
+      if (state.mode === "phrase") phraseInput.value = state.phrase;
+      resetDrill();
+      resetStability();
+      voter.clear();
+    });
+  });
+
+  phraseStart.addEventListener("click", () => {
+    const p = (phraseInput.value || "").toUpperCase().trim();
+    if (p) {
+      state.phrase = p;
+      resetDrill();
+    }
+  });
+  phraseInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") phraseStart.click();
+  });
+
+  copyBtn.addEventListener("click", async () => {
+    const text = state.mode === "free" ? state.typed
+      : state.mode === "phrase" ? state.phrase
+      : DRILL_SEQ.join("");
+    try {
+      await navigator.clipboard.writeText(text);
+      copyBtn.textContent = "Copied!";
+      setTimeout(() => { copyBtn.textContent = "Copy"; }, 1200);
+    } catch (e) {
+      copyBtn.textContent = "Failed";
+    }
+  });
+
+  clearBtn.addEventListener("click", () => {
+    if (state.mode === "free") {
+      state.typed = "";
+      updateOutputUI();
+    } else {
+      resetDrill();
+    }
+  });
+
+  soundToggle.addEventListener("click", () => {
+    soundOn = !soundOn;
+    soundToggle.textContent = soundOn ? "🔊" : "🔇";
+  });
+
+  // ---------------- camera + tracking ----------------
+  async function initCamera() {
+    if (typeof Hands === "undefined" || typeof Camera === "undefined") {
+      setStatus("Hand-tracking libraries failed to load (check internet)", true);
+      cameraError.classList.remove("hidden");
+      return;
+    }
+    try {
+      const hands = new Hands({
+        locateFile: (f) => "https://cdn.jsdelivr.net/npm/@mediapipe/hands/" + f,
+      });
+      hands.setOptions({
+        maxNumHands: 1,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.6,
+        minTrackingConfidence: 0.5,
+        selfieMode: true,
+      });
+      hands.onResults(onResults);
+      const camera = new Camera(video, {
+        onFrame: async () => { await hands.send({ image: video }); },
+        width: 640,
+        height: 480,
+      });
+      setStatus("Starting camera…");
+      await camera.start();
+      canvas.width = video.videoWidth || 640;
+      canvas.height = video.videoHeight || 480;
+      setStatus("Ready — hold a sign to type");
+    } catch (err) {
+      console.error(err);
+      setStatus("Camera unavailable", true);
+      cameraError.classList.remove("hidden");
+    }
+  }
+
+  // ---------------- neural engine ----------------
+  async function initNet() {
+    try {
+      const res = await fetch("asl-net.json");
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      netModel = NET.load(await res.json());
+      netStatus = "ready";
+      console.log("Neural engine ready:", netModel.letters.length, "letters");
+    } catch (e) {
+      netStatus = "error";
+      console.warn("Neural engine unavailable (", e.message, ") — falling back to rules only");
+    }
+  }
+
+  /* Run the neural engine on this frame's landmarks: flatten the 21
+     mediapipe points [x, y, z] in order (as the model was trained) and
+     classify. Returns { letter, conf, probs } or null when no model. */
+  function predictNet(lm) {
+    if (!netModel) return null;
+    const v = new Float32Array(63);
+    for (let i = 0; i < 21; i++) {
+      v[i * 3] = lm[i].x;
+      v[i * 3 + 1] = lm[i].y;
+      v[i * 3 + 2] = lm[i].z;
+    }
+    return NET.predict(netModel, v);
+  }
+
+  /* The three-engine decision. Returns:
+       { letter, via, conf, vec, hint }
+     letter: the chosen letter or null; via: "net" | "rules" | "learned";
+     vec: canonical vector for collection; hint: what to show when unsure.
+     Rules stay in charge unless the net is confident AND (rules agree,
+     rules are silent, the letter is net-only N/P/Q, or the learned DB —
+     which knows this user's hand — backs the net). The learned DB is
+     also the final fallback for letters the net hasn't learned well. */
+  function classifyFrame(flat, feats) {
+    const rulesLetter = ASL.classify(feats);
+    const nres = predictNet(flat);
+    const vec = KNN.canonicalize(flat);
+    let learned = null;
+    if (vec) learned = learnedModel.classify(vec);
+    const learnedOk = !!(learned && learned.letter &&
+      learned.conf >= CONF_MIN && learned.nn <= NN_MAX);
+
+    if (nres) {
+      const netOnly = NET_ONLY.has(nres.letter);
+      if (nres.conf >= NET_CONF_MIN) {
+        const agreeRules = rulesLetter === nres.letter;
+        const agreeLearned = learnedOk && learned.letter === nres.letter;
+        if (netOnly || agreeRules || !rulesLetter || agreeLearned) {
+          return { letter: nres.letter, via: "net", conf: nres.conf, vec,
+            hint: `${nres.letter} · ${Math.round(nres.conf * 100)}% confident — hold to type` };
+        }
+      }
+    }
+    if (rulesLetter) {
+      return { letter: rulesLetter, via: "rules", conf: 0, vec,
+        hint: ASL.LETTERS[rulesLetter].desc };
+    }
+    if (learnedOk) {
+      return { letter: learned.letter, via: "learned", conf: learned.conf, vec,
+        hint: `your ${learned.letter} · learned from ${library.counts()[learned.letter] || 0} samples — hold to type` };
+    }
+    let hint = "Not recognized — check the guide";
+    if (nres) hint = `Net: ${nres.letter} at ${Math.round(nres.conf * 100)}% — hold still or adjust your hand`;
+    else if (learned && learned.letter) {
+      hint = `Learned ${learned.letter} only ${Math.round(learned.conf * 100)}% — hold still or add samples`;
+    }
+    return { letter: null, via: "none", conf: 0, vec, hint };
+  }
+
+  function onResults(results) {
+    frameCount++;
+    const now = performance.now();
+
+    ctx.save();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+
+    const lm = results.multiHandLandmarks && results.multiHandLandmarks[0];
+    if (lm) {
+      drawConnectors(ctx, lm, HAND_CONNECTIONS, { color: "#22d3ee", lineWidth: 3 });
+      drawLandmarks(ctx, lm, { color: "#f472b6", lineWidth: 2, radius: 4 });
+      noHandFrames = 0;
+      handHint.classList.remove("show");
+      processFrame(lm, now);
+    } else {
+      noHandFrames++;
+      voter.push(null); // decay the vote while the hand is gone
+      if (noHandFrames > 12) handHint.classList.add("show");
+      resetStability();
+      setCurrentDisplay("—", "", "Hold a sign steady to type it");
+      featuresEl.innerHTML = "";
+      document.querySelectorAll(".key").forEach((k) => k.classList.remove("active"));
+    }
+    ctx.restore();
+
+    if (now - fpsTimer > 1000) {
+      fps = Math.round((frameCount * 1000) / (now - fpsTimer));
+      frameCount = 0;
+      fpsTimer = now;
+    }
+  }
+
+  function setCurrentDisplay(glyph, cls, name) {
+    const now = performance.now();
+    if (now - flashAt < 450) cls = cls ? "flash " + cls : "flash";
+    if (glyph !== lastGlyph || cls !== lastCls) {
+      currentLetterEl.textContent = glyph;
+      currentLetterEl.className = "current-letter" + (cls ? " " + cls : "");
+      lastGlyph = glyph;
+      lastCls = cls;
+    }
+    currentNameEl.textContent = name;
+  }
+
+  function processFrame(lm, now) {
+    const flat = lm.map((p) => [p.x, p.y, p.z]);
+    const feats = ASL.analyze(flat);
+    const read = classifyFrame(flat, feats);
+
+    let typedLetter = null;
+    let glyph = "?", cls = "unknown", name = read.hint;
+
+    // index-tip trail for J / Z (motion letters are rule-based)
+    if (feats.ext.index && !feats.ext.middle && !feats.ext.ring && !feats.ext.pinky) {
+      motionPath.push({ x: lm[ASL.L.INDEX_TIP].x, y: lm[ASL.L.INDEX_TIP].y, t: now });
+    }
+    while (motionPath.length && now - motionPath[0].t > 1500) motionPath.shift();
+
+    // ---- what is the hand signing right now? ----
+    const openHand = feats.pattern === "1111" && feats.thumbOut;
+    if (openHand) {
+      typedLetter = " "; // " " => space
+      glyph = "5"; cls = "space";
+      name = "open hand · types space";
+    } else if (read.letter) {
+      typedLetter = read.letter;
+      glyph = read.letter;
+      cls = read.via === "learned" ? "learned" : "";
+      name = read.hint;
+    }
+
+    // ---- motion letters (J / Z) ----
+    evaluateMotion(feats, now);
+
+    // ---- temporal smoothing ----
+    // Per-frame recognition flickers between look-alike letters (A/S/E,
+    // H/U, V/K...). A single misread frame used to reset the whole hold
+    // timer — now a letter must win a majority of the last 10 frames, so
+    // glitches can't break a hold or type the wrong letter.
+    const rawLetter = typedLetter;
+    const voted = voter.push(rawLetter);
+    if (voted !== null) {
+      typedLetter = voted;
+      if (voted !== rawLetter) {
+        // mid-transition: the vote still points at the previous letter
+        glyph = voted === " " ? "5" : voted;
+        cls = voted === " " ? "space" : "";
+        name = voted === " " ? "open hand · types space" : ASL.LETTERS[voted].desc;
+      }
+    } else if (rawLetter !== null) {
+      // hand visible but no majority yet (switching letters)
+      glyph = "…"; cls = "unknown";
+      name = "Reading your hand…";
+      typedLetter = null;
+    }
+
+    setCurrentDisplay(glyph, cls, name);
+
+    document.querySelectorAll(".key").forEach((k) => {
+      k.classList.toggle("active",
+        k.dataset.letter === (typedLetter === " " ? "SPACE" : typedLetter));
+    });
+
+    // ---- stability → type ----
+    if (typedLetter !== null) {
+      if (typedLetter === stableLetter && !holdTyped) {
+        if (stableSince === 0) stableSince = now;
+        const canType = now - lastMotionType > 800 &&
+          now - (cooldown[typedLetter] || 0) > 900 &&
+          now - lastTypedAt > 250;
+        if (now - stableSince >= 500 && canType) {
+          typeLetter(typedLetter, false);
+          cooldown[typedLetter] = now;
+          holdTyped = true; // one letter per hold
+        }
+      } else if (typedLetter !== stableLetter) {
+        // hold just started: the vote majority is solid, so this is a
+        // good moment to learn from the sign
+        if (rawLetter !== null && rawLetter === typedLetter && typedLetter !== " ") {
+          if (read.via === "net" && read.conf >= COLLECT_CONF) {
+            collectSample(typedLetter, read.vec); // automatic learning
+          } else if (seedTrain.open && typedLetter === seedTarget) {
+            collectSample(typedLetter, read.vec); // deliberate seed training
+          }
+        }
+        stableLetter = typedLetter;
+        stableSince = now;
+        holdTyped = false;
+      }
+    } else {
+      resetStability();
+    }
+
+    // ---- live feature readout ----
+    renderFeatures(feats);
+  }
+
+  function evaluateMotion(feats, now) {
+    const pointing = feats.pattern === "1000" && !feats.thumbOut;
+    if (!pointing) return;
+    const path = motionPath.filter((p) => now - p.t <= 900);
+    if (path.length < 14) return;
+    const letter = ASL.classifyMotion(path);
+    if (letter && now - (cooldown[letter] || 0) > 1500) {
+      cooldown[letter] = now;
+      lastMotionType = now;
+      typeLetter(letter, false);
+      motionPath.length = 0;
+    }
+  }
+
+  function renderFeatures(feats) {
+    const names = ["index", "middle", "ring", "pinky"];
+    const dots = names.map((n) =>
+      `<span class="f-${feats.ext[n] ? "on" : "off"}" title="${n}">${feats.ext[n] ? "●" : "○"}</span>`).join("");
+    const thumb = `<span class="f-${feats.thumbOut ? "on" : "off"}" title="thumb">${feats.thumbOut ? "●" : "○"}</span>`;
+    const engine = netStatus === "ready" ? "🧠 neural" : netStatus === "error" ? "rules" : "🧠 loading…";
+    const learned = library.total
+      ? `<span class="f-label">· learned</span> ${library.total}/${Object.keys(library.counts()).length}`
+      : "";
+    featuresEl.innerHTML =
+      `<span class="f-label">pattern ${feats.pattern}</span> ${dots}${thumb}` +
+      `<span class="f-label">· thumb ${feats.thumbOut ? "out" : "folded"}</span>` +
+      learned +
+      `<span class="f-fps">${engine} · ${fps} fps</span>`;
+  }
+
+  // ---------------- go ----------------
+  renderSeed();
+  updateOutputUI();
+  initNet();
+  initLearn();
+  initCamera();
+})();
+</script>
+</body>
+</html>
